@@ -40,20 +40,6 @@ namespace puffinn {
             return l2_distance_float_simple(lhs, rhs, dimension);
         }
 
-        static void add_assign(float* const lhs, const float* rhs, unsigned int dimensions)
-        {   
-            add_assign_float_simple(lhs, rhs, dimensions);
-        }
-        static void subtract_assign(float * const lhs, const float* rhs, unsigned int dimensions){
-            
-            subtract_assign_float_simple(lhs,rhs, dimensions);
-
-        }
-        static void divide_assign(float* lhs, const unsigned int div, unsigned int dimensions)
-        {
-            multiply_assign_float_simple(lhs, 1.0/div, dimensions);
-        }
-
         static std::vector<float> generate_random(unsigned int dimensions) {
             std::normal_distribution<float> normal_distribution(0.0, 1.0);
             auto& generator = get_default_random_generator();

@@ -1,5 +1,9 @@
 #pragma once
 #include "puffinn/dataset.hpp"
+#include "puffinn/format/unit_vector.hpp"
+#include "puffinn/format/real_vector.hpp"
+#include "puffinn/math.hpp"
+
 #include <vector>
 #include <iostream>
 #include <algorithm>
@@ -16,11 +20,11 @@ namespace puffinn
     // Manage padding when using avx2 and vectors are divided into M sections
 
     /// Class for performing k-means clustering on a given dataset
-    template <typename TFormat>
     class KMeans
     {
         struct RunData {
-            Dataset<TFormat> centroids, sums;
+            Dataset<UnitVectorFormat> centroids;
+            Dataset<RealVectorFormat> sums;
             unsigned int* counts;
             uint8_t* labels;
             float* distances;
@@ -57,7 +61,7 @@ namespace puffinn
         unsigned int offset = 0;
         // reference to data contained in Index instance
         // centroids is for the current run and gb_centroids is for the global best
-        Dataset<TFormat> &dataset,
+        Dataset<UnitVectorFormat> &dataset,
                           gb_centroids;
 
         uint8_t *gb_labels;
@@ -71,7 +75,7 @@ namespace puffinn
         float gb_inertia = FLT_MAX;
 
     public:
-        KMeans(Dataset<TFormat> &dataset, uint8_t K_clusters)
+        KMeans(Dataset<UnitVectorFormat> &dataset, uint8_t K_clusters)
             : K(K_clusters),
               N(dataset.get_size()),
               vector_len(dataset.get_description().storage_len),
@@ -81,7 +85,7 @@ namespace puffinn
             std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
             gb_labels = new uint8_t[N];
         }
-        KMeans(Dataset<TFormat> &dataset, uint8_t K_clusters,unsigned int offset, unsigned int subspaceSize)
+        KMeans(Dataset<UnitVectorFormat> &dataset, uint8_t K_clusters,unsigned int offset, unsigned int subspaceSize)
             : K(K_clusters),
               N(dataset.get_size()),
               vector_len(subspaceSize),
@@ -115,12 +119,12 @@ namespace puffinn
             }
         }
 
-        typename TFormat::Type* getCentroid(size_t c_i) {
+        typename UnitVectorFormat::Type* getCentroid(size_t c_i) {
             return gb_centroids[c_i];
         }
 
-        Dataset<TFormat> getAllCentroids(){
-            Dataset<TFormat> tmp(vector_len, K);
+        Dataset<UnitVectorFormat> getAllCentroids(){
+            Dataset<UnitVectorFormat> tmp(vector_len, K);
             tmp = gb_centroids;
             return tmp;
         }
@@ -140,7 +144,7 @@ namespace puffinn
 
         }
         // samples K random points and uses those as starting centers
-        void init_centers_random(Dataset<TFormat> &cen)
+        void init_centers_random(Dataset<UnitVectorFormat> &cen)
         {
             // Try using kmeans++ initialization algorithm
             std::cerr << "Init random centers" << std::endl;
@@ -153,13 +157,14 @@ namespace puffinn
                 unsigned int sample_idx = random_idx(rand_gen);
                 if (used.find(sample_idx) == used.end()) {
                     used.insert(sample_idx);
-                    typename TFormat::Type* sample = dataset[sample_idx];
+                    typename UnitVectorFormat::Type* sample = dataset[sample_idx];
                     std::copy(sample, sample + vector_len, cen[c_i]);
                     c_i++;
                 }
             }
         }
 
+        // Kmeans++ initialization of centroids
         void init_centroids_kpp(struct RunData& rd)
         {
             showCentroids(rd.centroids);
@@ -186,9 +191,9 @@ namespace puffinn
             std::copy(dataset[sample_idx]+offset, dataset[sample_idx]+offset + vector_len, rd.centroids[0]);
             // Calc all distances to this centroid
             for (size_t i = 0; i < N; i++) {
-                float dist = TFormat::distance(dataset[i]+offset, rd.centroids[0], vector_len);
+                float dist = UnitVectorFormat::distance(dataset[i]+offset, rd.centroids[0], vector_len);
                 rd.distances[i] = dist;
-                TFormat::add_assign(rd.sums[0], dataset[i]+offset, vector_len);
+                UnitVectorFormat::add_assign_float(rd.sums[0], dataset[i]+offset, vector_len);
                 rd.counts[0]++;
                 rd.labels[i] = 0;
             }            
@@ -201,6 +206,7 @@ namespace puffinn
             float rn = rng(rand_gen);
             return rn;
         }
+
         // Performs a single kmeans clustering 
         // centroids are set to the member centroids
         // Using the lloyd algorithm for clustering
@@ -244,7 +250,7 @@ namespace puffinn
         {
             // for every data entry
             for (size_t i = 0; i < N; i++) {
-                float dist = TFormat::distance(dataset[i]+offset, rd.centroids[c_i], vector_len);
+                float dist = UnitVectorFormat::distance(dataset[i]+offset, rd.centroids[c_i], vector_len);
                 if (dist < rd.distances[i]) {
                     updateState(rd, i, c_i);
                     rd.distances[i] = dist;
@@ -262,8 +268,8 @@ namespace puffinn
         void updateState(struct RunData& rd, size_t i, size_t c_i)
         {
             if (rd.labels[i] == c_i) return;
-            TFormat::subtract_assign(rd.sums[rd.labels[i]], dataset[i]+offset, vector_len);
-            TFormat::add_assign(rd.sums[c_i], dataset[i]+offset, vector_len);
+            UnitVectorFormat::subtract_assign_float(rd.sums[rd.labels[i]], dataset[i]+offset, vector_len);
+            UnitVectorFormat::add_assign_float(rd.sums[c_i], dataset[i]+offset, vector_len);
             rd.counts[rd.labels[i]]--;
             rd.counts[c_i]++;
             rd.labels[i] = c_i;
@@ -286,10 +292,13 @@ namespace puffinn
         void setNewCenters(struct RunData& rd) {
             std::cerr << "setNewCentroids start" << std::endl;
             showCentroids(rd.centroids);
-            std::copy(rd.sums[0], rd.sums[K-1] + vector_len, rd.centroids[0]);
             // Average all centroids by the number of elements in cluster
+            Dataset<RealVectorFormat> temp_sums(vector_len, K);
+            std::copy(rd.sums[0], rd.sums[K-1] + vector_len, temp_sums[0]);
             for (size_t c_i = 0; c_i < K; c_i++) {
-                TFormat::divide_assign(rd.centroids[c_i], rd.counts[c_i], vector_len);
+                // divide all sums by the count of vectors in cluster
+                multiply_assign_float(temp_sums[c_i], 1.0/rd.counts[c_i], vector_len);
+                UnitVectorFormat::copy_from_float(rd.centroids[c_i], temp_sums[c_i], vector_len);
             }
             std::cerr << "setNewCentroids end" << std::endl;
             showCentroids(rd.centroids);
@@ -303,7 +312,15 @@ namespace puffinn
             std::cerr << std::endl;
         }
 
-        void show(typename TFormat::Type* arr, size_t size) 
+        void show(typename UnitVectorFormat::Type* arr, size_t size) 
+        {
+            for (size_t i = 0; i < size; i++) {
+                std::cerr << UnitVectorFormat::from_16bit_fixed_point(arr[i]) << " ";
+            }
+            std::cerr << std::endl;
+        }
+
+        void show(float* arr, size_t size) 
         {
             for (size_t i = 0; i < size; i++) {
                 std::cerr << arr[i] << " ";
@@ -316,7 +333,7 @@ namespace puffinn
             showCentroids(gb_centroids);
         }
 
-        void showCentroids(Dataset<TFormat> &cen) {
+        void showCentroids(Dataset<UnitVectorFormat> &cen) {
             for (size_t c_i = 0; c_i < K; c_i++) {
                 std::cerr << "Centroid " << c_i << ": ";
                 show(cen[c_i], vector_len);

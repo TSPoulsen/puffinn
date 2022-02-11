@@ -18,6 +18,15 @@ endif()
 
 include_directories("test/include")
 add_executable(Test "test/main.cpp" "test/code.cpp")
+
+
+find_package(HDF5 COMPONENTS CXX)
+if (HDF5_FOUND)
+    add_executable(Quick "test/quick.cpp")
+    include_directories("${HDF5_CXX_INCLUDE_DIRS}")
+    target_link_libraries(Quick ${HDF5_CXX_LIBRARIES})
+endif()
+
 if (OpenMP_FOUND)
     target_link_libraries(Test ${OpenMP_CXX_LIBRARIES})
 endif()

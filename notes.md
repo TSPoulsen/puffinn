@@ -32,10 +32,12 @@ Format for PQ:
   - [ ] Get SIMD  to work for subspaces
 - [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
 - [ ] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
+  - [x] Kmeans
+  - [ ] PQ
 - [x] Test quantization error
 - [ ] Begin writing formal problem definition of ANN
 - [ ] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
--[] Look at previous bsc. projects of what is included and to what level of expertize.
+- [ ] Look at previous bsc. projects of what is included and to what level of expertize.
 
 
 

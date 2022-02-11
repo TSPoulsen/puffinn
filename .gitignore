@@ -1,5 +1,12 @@
+
+# Data directory
+data/
+
 # vim
 *.swp
+
+# vscode
+**/.vscode
 
 # Compiled Object files
 *.slo
@@ -31,6 +38,9 @@
 *.out
 *.app
 Test
+Quick
+GloveExample
+
 
 # CMake
 CMakeCache.txt
