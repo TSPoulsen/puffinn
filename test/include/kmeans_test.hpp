@@ -39,6 +39,7 @@ namespace kmeans {
                                 centroids = {c1,c2};
         REQUIRE(correct == centroids);
     }
+
     TEST_CASE("basic kmeans clustering subspace") {
         unsigned int N = 8, dims = 2, K=2;
         std::vector<float>  data[N] = {
@@ -55,16 +56,16 @@ namespace kmeans {
         for (auto entry : data) {
             dataset.insert(entry);
         }
-        KMeans<RealVectorFormat> kmeans(dataset, (uint8_t)K, 1);
-        kmeans.fit(0);
-        kmeans.fit(1);
+        KMeans<RealVectorFormat> kmeans(dataset, (uint8_t)K);
+        kmeans.fit();
+        kmeans.fit();
         float   *cen1 = kmeans.getCentroid(0),
                 *cen2 = kmeans.getCentroid(1);
-        std::vector<float> c1(cen1, cen1+1);
-        std::vector<float> c2(cen2, cen2+1);
+        std::vector<float> c1(cen1, cen1+2);
+        std::vector<float> c2(cen2, cen2+2);
         std::set<std::vector<float>>
-                                correct = {{2},
-                                            {1}},
+                                correct = {{-2.5,1},
+                                            {2.5,2}},
                                 centroids = {c1,c2};
         REQUIRE(correct == centroids);
     }
@@ -84,8 +85,8 @@ namespace kmeans {
         for (auto entry : data) {
             dataset.insert(entry);
         }
-        KMeans<RealVectorFormat> kmeans(dataset, (uint8_t)K, 1);
-        kmeans.fit(0);
+        KMeans<RealVectorFormat> kmeans(dataset, (uint8_t)K);
+        kmeans.fit();
         float   *cen1 = kmeans.getCentroid(0),
                 *cen2 = kmeans.getCentroid(1);
         std::vector<float> c1(cen1, cen1+1);

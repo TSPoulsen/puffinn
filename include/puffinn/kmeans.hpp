@@ -81,11 +81,12 @@ namespace puffinn
             std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
             gb_labels = new uint8_t[N];
         }
-        KMeans(Dataset<TFormat> &dataset, uint8_t K_clusters, unsigned int subspaceSize)
+        KMeans(Dataset<TFormat> &dataset, uint8_t K_clusters,unsigned int offset, unsigned int subspaceSize)
             : K(K_clusters),
               N(dataset.get_size()),
               vector_len(subspaceSize),
               dataset(dataset),
+              offset(offset),
               gb_centroids(vector_len, K)
         {
             std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
@@ -96,12 +97,11 @@ namespace puffinn
         {
             delete[] gb_labels;
         }
-        void fit(unsigned int m = 0)
+        void fit()
         {
             //clean up for next subspace fit
             gb_inertia = FLT_MAX;
             std::cerr << "fit called" << std::endl;
-            offset = m*vector_len;
             // init_centers_random(); doesn't work
             for(uint8_t run=0; run < N_RUNS; run++) {
                 struct RunData rd(N, K, vector_len);

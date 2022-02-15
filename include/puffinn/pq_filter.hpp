@@ -8,57 +8,53 @@
 namespace puffinn{
     template<typename TFormat>
     class PQFilter{
-        const unsigned int M;
+        const unsigned int M, dims;
         const unsigned char K;
-        //The size of each subspace, has issues if n % M != 0;
-        const unsigned int subspaceSize;
         //codebook that contains m*k centroids
         std::vector<Dataset<TFormat>> codebook;
         Dataset<TFormat> &dataset;
         std::vector<std::vector<uint8_t>> pqCodes;
+        std::vector<unsigned int> subspaceSizes;
         public:
-        PQFilter(Dataset<TFormat> &dataset, unsigned int m = 16, unsigned int k = 256)
+        PQFilter(Dataset<TFormat> &dataset, unsigned int dims, unsigned int m = 16, unsigned int k = 256)
         :dataset(dataset),
+        dims(dims),
         M(m),
         K(k),
-        pqCodes(dataset.get_size()),
-        subspaceSize(dataset.get_description().storage_len/M)
+        pqCodes(dataset.get_size())
         {
-            initCodebook();
+            subspaceSizes.resize(M);
+            fill(subspaceSizes.begin(), subspaceSizes.end(), dims/M);
         }
-        private:
+        
+        void setSubspaceSizes(std::vector<unsigned int> subs){
+            subspaceSizes = subs;
+        }
+
+
         //Runs kmeans for all m subspaces and stores the centroids in codebooks
-        void initCodebook(){
-            KMeans<TFormat> kmeans(dataset, K, subspaceSize);
-            for (size_t m = 0; m < M; m++)
+        void createCodebook(){
+            //used to keep track of where subspace begins
+            int offset = 0;
+            for(unsigned int subSize: subspaceSizes)
             {
-                //fit to each subspace
-                kmeans.fit(m);
-                //get the resulting centroids for each subspace
+                //RunKmeans for the given subspace
+                //gb_labels for this subspace will be the mth index of the PQcodes
+                
+                KMeans<TFormat> kmeans(dataset, K, offset, subSize); 
+                kmeans.fit();
                 codebook.push_back(kmeans.getAllCentroids());
-                //get gb_labels from fitting, the m'th fit will be the i'th index of the PQCodes
                 uint8_t * labels = kmeans.getLabels();
-                //std::cout << "gb_labels "<< std::endl;
                 for(int i = 0; i < dataset.get_size(); i++){
-                    //std::cout << labels[i] << std::endl;
                     pqCodes[i].push_back(labels[i]);
                 }
+                offset += subSize;
             }
-            showCodebook();
-            showPQCodes();
-            std::cout << "Calculating quantization error for index 1: " << quantizationError(1) << std::endl;
+            //showCodebook();
+            //showPQCodes();
+            //std::cerr << "Calculating quantization error for index 1: " << quantizationError(1) << std::endl;
         }
 
-        void showPQCodes(){
-            std::cout << "PQCODE: ";
-            for(std::vector<uint8_t> pqCode: pqCodes){
-                for(uint8_t val: pqCode){
-                    std::cout << (unsigned int) val << " ";
-                }
-                std::cout << std::endl;
-            }
-
-        }
 
         std::vector<uint8_t> getPQCode(int index){
             return pqCodes[index];
@@ -67,31 +63,65 @@ namespace puffinn{
         float quantizationError(int index){
             float sum = 0;
             typename TFormat::Type* vec = dataset[index];
-            int centroidID;
+            int centroidID, offset = 0;
+
             for(int m = 0; m < M; m++){
                 centroidID = pqCodes[index][m];
-                sum += TFormat::distance(vec + (m*subspaceSize), codebook[m][centroidID], subspaceSize);
+                sum += TFormat::distance(vec + offset, codebook[m][centroidID], subspaceSizes[m]);
+                offset += subspaceSizes[m];
             }
-            std::cout <<" quantization error for: ";
-            for(int k = 0; k < M*subspaceSize; k++){
+            /*
+            std::cout <<" quantization error for: " << index << " ";
+            for(int k = 0; k < dims; k++){
                 std::cout << vec[k] << " ";  
             }
-            std::cout << std::endl;
+            std::cout << sum << std::endl;
+            */
+            return sum;
+        }
+        float totalQuantizationError(){
+            float sum = 0;
+            for(int i  = 0; i < dataset.get_size(); i++){
+                sum += quantizationError(i);
+            }
             return sum;
         }
 
+        std::vector<float> getCluser(unsigned int mID, unsigned int kID){
+            return std::vector<float>(codebook[mID][kID], codebook[mID][kID]+ subspaceSizes[mID]);
+        }
+
+        //Functions below are just debugging tools 
         void showCodebook(){
             for(int m = 0; m < M; m++){
-                std::cout << "subspace: " << m << std::endl;
+                std::cerr << "subspace: " << m << std::endl;
                 for(int k = 0; k < K; k++){
-                    std::cout << "cluster: "<< k << std::endl;
-                    for(int l = 0; l < subspaceSize; l++){
-                        std::cout << "\t" <<codebook[m][k][l] << " ";
+                    std::cerr << "cluster: "<< k << std::endl;
+                    for(int l = 0; l < subspaceSizes[m]; l++){
+                        std::cerr << "\t" <<codebook[m][k][l] << " ";
                     }
-                    std::cout << std::endl;
+                    std::cerr << std::endl;
                 }
-                std::cout << std::endl;
+                std::cerr << std::endl;
             } 
-        }            
+        }
+
+        void showPQCodes(){
+            std::cerr << "PQCODE: ";
+            for(std::vector<uint8_t> pqCode: pqCodes){
+                for(uint8_t val: pqCode){
+                    std::cerr << (unsigned int) val << " ";
+                }
+                std::cerr << std::endl;
+            }
+
+        }
+
+        void showSubSizes(){
+            for(auto a: subspaceSizes){
+                std::cerr << a << " ";
+            }
+            std::cerr << std::endl;
+        }
     };
 }
