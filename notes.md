@@ -26,11 +26,11 @@ Format for PQ:
 - [x] Working implementation of PQ class to follow format of 'filterer' in index class, and decide design for codebook. i.e. 
 - [x] Implement simple PQ Code function
 - [ ] Do not store PQ codes explicitly
-- [ ] deciding sizes when $d/M \mod 2 \ne 0$ (**VIKTOR**) -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
-  - [ ] Get SIMD to work for subspaces
+- [x] deciding sizes when $d/M \mod 2 \ne 0$ (**VIKTOR**) -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
+  - [ ] Get SIMD  to work for subspaces
 - [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
 - [ ] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
-- [ ] Test quantization error
+- [x] Test quantization error
 - [ ] Begin writing formal problem definition of ANN
 - [ ] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
 -[] Look at previous bsc. projects of what is included and to what level of expertize.
@@ -46,3 +46,26 @@ Format for PQ:
     - Other options?
 
 
+
+
+### Agenda for meeting (16/02)
+#### Current to do
+- built simple test suite to test correctness (*Tim*)
+- Move from general TFormat to Unit Vector
+- Finish First iteration of PQ (distance between pqcode and q-point)
+- Writing broad scope parts of paper (*Viktor*) (not important)
+
+#### what next
+  - boot strapping for treshold values
+  - get SIMD to work/Optimizing
+  - Begin integrating our current solution in the Puffinn pipeline 
+
+#### Questions
+- Current Idea for optimizing simd involves adding single point dimensions (In theory it shouldn't mess with correctness?)
+- Should we worry about precomputing/exstra-space
+- How much should we focus on good code practices vs performance
+ 
+nanoPQ
+Look more into alignment
+Just find best parameters and optimizae for those
+Gerneral -> optimize 
