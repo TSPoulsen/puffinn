@@ -22,10 +22,12 @@ Format for PQ:
 
 #### TODO:
 - [ ] Begin implementation of naive PQ with both euclidean dist optimization and mahalanobis dist. ~ 
+- [ ] Create Distance table and implement asymmetric and symmetric distance estimator
 - [ ] Implement random permutation of data points, does it have any effect on (LSH scheme?)
 - [x] Working implementation of PQ class to follow format of 'filterer' in index class, and decide design for codebook. i.e. 
+  - [x] Compute offsets once 
 - [x] Implement simple PQ Code function
-- [ ] Do not store PQ codes explicitly
+- [x] Do not store PQ codes explicitly
 - [x] deciding sizes when $d/M \mod 2 \ne 0$ (**VIKTOR**) -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
   - [ ] Get SIMD  to work for subspaces
 - [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
@@ -44,6 +46,7 @@ Format for PQ:
     - Empirically figure out what works at 'index building time'
     - Bootstrap threshhold such that X\% is above threshhold according to real inner products (maybe faulty as estimated cosine dists are biased??)
     - Other options?
+- Should PQcodes not be precomputed? It is slower to determine PQcode than it is calculating true inner product
 
 
 
