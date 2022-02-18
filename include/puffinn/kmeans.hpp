@@ -60,17 +60,12 @@ namespace puffinn
         const size_t vector_len;
         unsigned int offset = 0;
         // reference to data contained in Index instance
-        // centroids is for the current run and gb_centroids is for the global best
+        // gb_centroids is for the global best set of centroids
         Dataset<UnitVectorFormat> &dataset,
                           gb_centroids;
 
         uint8_t *gb_labels;
 
-        // We don't need centroid, labels, sums, counts after fit has been called
-        // They takeup quite a lot of space
-
-        // contains sum of all vectors in clusters
-        // contains count of vectors in each cluster
 
         float gb_inertia = FLT_MAX;
 
@@ -89,8 +84,8 @@ namespace puffinn
             : K(K_clusters),
               N(dataset.get_size()),
               vector_len(subspaceSize),
-              dataset(dataset),
               offset(offset),
+              dataset(dataset),
               gb_centroids(vector_len, K)
         {
             std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
