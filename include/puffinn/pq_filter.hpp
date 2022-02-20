@@ -119,6 +119,11 @@ namespace puffinn{
             */
             return sum;
         }
+
+        float quantizationError(unsigned int idx) {
+            return quantizationError(dataset[idx]);
+        }
+
         float totalQuantizationError(){
             float sum = 0;
             for(unsigned int i  = 0; i < dataset.get_size(); i++){

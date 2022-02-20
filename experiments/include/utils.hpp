@@ -3,11 +3,14 @@
 #include <vector>
 #include <iostream>
 #include <valarray>
+#include <climits>
 #include <H5Cpp.h>
+#include <string>
 #include <chrono>
 
-// Hardcoded to use this dataset
-#define HDF5_FILE_PATH "/home/tim/repositories/itu/puffinn/data/mnist-784-euclidean.hdf5"
+
+// Relative path to use this dataset
+#define DEFAULT_HDF5_FILE "data/glove-25-angular.hdf5"
 
 namespace utils {
     struct Timer {
@@ -28,10 +31,12 @@ namespace utils {
     };
 
     // This code is 'inspired' by https://github.com/Cecca/running-experiments/blob/master/datasets.hpp
-    void load(puffinn::Dataset<puffinn::UnitVectorFormat>& dataset, std::string set) {
+    template<typename TFormat>
+    std::pair<int, int> load(puffinn::Dataset<TFormat>& dataset, std::string set, std::string path = DEFAULT_HDF5_FILE, int max_size = INT_MAX) {
 
         // Open the file and get the dataset
-        H5::H5File file(HDF5_FILE_PATH , H5F_ACC_RDONLY);
+        std::cerr << "LOADING FILE" << std::endl;
+        H5::H5File file(path, H5F_ACC_RDONLY);
         H5::Group group = file.openGroup("/");
         H5::DataSet h5_dataset = group.openDataSet(set);
 
@@ -44,14 +49,16 @@ namespace utils {
         hsize_t data_dims[2];
         dataspace.getSimpleExtentDims(data_dims, NULL);
         int n = data_dims[0], dim = data_dims[1];
-        std::cout << "Loaded train dataset of size (" << n << "," << dim << ")" << std::endl;
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         std::valarray<float> temp(n * dim);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
-        for (size_t i = 0; i < n; i++ ) {
+        if (n > max_size) n = max_size;
+        for (int i = 0; i < n; i++ ) {
             std::vector<float> vec(&temp[i*dim], &temp[(i+1)*dim]);
             dataset.insert(vec);
         }
+        std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
+        return std::make_pair(n, dim);;
     }
 
 }

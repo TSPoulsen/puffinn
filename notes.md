@@ -22,22 +22,27 @@ Format for PQ:
 
 #### TODO:
 - [ ] Begin implementation of naive PQ with both euclidean dist optimization and mahalanobis dist. ~ 
-- [ ] Create Distance table and implement asymmetric and symmetric distance estimator
+  - [x] Euclidean
+  - [ ] Mahalanobis
+- [x] Create Distance table and implement asymmetric and symmetric distance estimator
+  - [x] Symmetric
+  - [x] Asymmetric
 - [ ] Implement random permutation of data points, does it have any effect on (LSH scheme?)
 - [x] Working implementation of PQ class to follow format of 'filterer' in index class, and decide design for codebook. i.e. 
   - [x] Compute offsets once 
 - [x] Implement simple PQ Code function
 - [x] Do not store PQ codes explicitly
 - [x] deciding sizes when $d/M \mod 2 \ne 0$ (**VIKTOR**) -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
-  - [ ] Get SIMD  to work for subspaces
 - [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
-- [ ] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
+- [x] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
   - [x] Kmeans
-  - [ ] PQ
+  - [x] PQ
 - [x] Test quantization error
 - [ ] Begin writing formal problem definition of ANN
-- [ ] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
+- [x] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
 - [ ] Look at previous bsc. projects of what is included and to what level of expertize.
+- [ ] Use Float inside kmeans instead of UnitVectorFormat (can be better optimized and shouldn't be a problem for space usage) 
+  - [ ] Get SIMD  to work for subspaces
 
 
 
@@ -48,7 +53,6 @@ Format for PQ:
     - Empirically figure out what works at 'index building time'
     - Bootstrap threshhold such that X\% is above threshhold according to real inner products (maybe faulty as estimated cosine dists are biased??)
     - Other options?
-- Should PQcodes not be precomputed? It is slower to determine PQcode than it is calculating true inner product
 
 
 

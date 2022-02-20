@@ -52,8 +52,8 @@ namespace puffinn
         };
 
         static constexpr float TOL = 0.0001f;
-        static const uint16_t MAX_ITER = 300;
-        static const uint8_t N_RUNS = 10;
+        static const uint16_t MAX_ITER = 100;
+        static const unsigned int N_RUNS = 3;
 
         const uint8_t K;
         const size_t N;
@@ -88,7 +88,7 @@ namespace puffinn
               dataset(dataset),
               gb_centroids(vector_len, K)
         {
-            std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
+            std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << "\toffset=" << offset << "\tsubspaceSize=" << subspaceSize << std::endl;
             gb_labels = new uint8_t[N];
         }
 
@@ -96,15 +96,15 @@ namespace puffinn
         {
             delete[] gb_labels;
         }
-        void fit()
+        void fit(unsigned int runs = N_RUNS, unsigned int max_iter = MAX_ITER)
         {
             //clean up for next subspace fit
             gb_inertia = FLT_MAX;
-            std::cerr << "fit called" << std::endl;
             // init_centers_random(); doesn't work
-            for(uint8_t run=0; run < N_RUNS; run++) {
+            for(unsigned int run=0; run < runs; run++) {
+                std::cerr << "Run " << run+1 << "/" << runs << std::endl;
                 struct RunData rd(N, K, vector_len);
-                float run_inertia = single_kmeans(rd);
+                float run_inertia = single_kmeans(rd, max_iter);
                 if (run_inertia < gb_inertia) {
                     // New run is the currently best, thus overwrite gb variables
                     gb_inertia = run_inertia;
@@ -130,19 +130,19 @@ namespace puffinn
 
     private:
 
-        float single_kmeans(struct RunData& rd)
+        float single_kmeans(struct RunData& rd, unsigned int max_iter)
         {
-            std::cerr << "single_kmeans called" << std::endl;
+            //std::cerr << "single_kmeans called" << std::endl;
             // init_centers_random(); doesn't work
             init_centroids_kpp(rd);
-            return lloyd(rd);
+            return lloyd(rd, max_iter);
 
         }
         // samples K random points and uses those as starting centers
         void init_centers_random(Dataset<UnitVectorFormat> &cen)
         {
             // Try using kmeans++ initialization algorithm
-            std::cerr << "Init random centers" << std::endl;
+            //std::cerr << "Init random centers" << std::endl;
             auto &rand_gen = get_default_random_generator();
             std::uniform_int_distribution<unsigned int> random_idx(0, N-1);
 
@@ -162,7 +162,7 @@ namespace puffinn
         // Kmeans++ initialization of centroids
         void init_centroids_kpp(struct RunData& rd)
         {
-            showCentroids(rd.centroids);
+            //showCentroids(rd.centroids);
             firstCentroid(rd);
             // 1 centroid is chosen
             for (size_t c_i = 1; c_i < K; c_i++) {
@@ -173,7 +173,7 @@ namespace puffinn
                 // compute all distances again
                 calcDists(rd, c_i);
             }
-            showCentroids(rd.centroids);
+            //showCentroids(rd.centroids);
 
         }
 
@@ -205,7 +205,7 @@ namespace puffinn
         // Performs a single kmeans clustering 
         // centroids are set to the member centroids
         // Using the lloyd algorithm for clustering
-        float lloyd(struct RunData& rd) {
+        float lloyd(struct RunData& rd, unsigned int max_iter) {
 
             float inertia = FLT_MAX, last_inertia;
             uint16_t iteration = 0;
@@ -213,19 +213,18 @@ namespace puffinn
             do
             {
                 rd.resetDists();
-                std::cerr << "lloyd iteration: " << iteration << std::endl;
+                //std::cerr << "\tlloyd iteration: " << iteration;
                 last_inertia = inertia;
                 setLabels(rd);
                 inertia = calcInertia(rd.distances);
-                std::cerr << "Which leads to an inertia of " << inertia << std::endl;
-                show(rd.labels, N);
+                //std::cerr << " with inertia: " << inertia << std::endl;
+                //show(rd.labels, N);
                 setNewCenters(rd);
                 iteration++;
-                std::cerr << std::endl << std::endl;
 
-            } while ((last_inertia-inertia) > TOL && iteration < MAX_ITER );
+            } while ((last_inertia-inertia) > TOL && iteration < max_iter );
             
-            std::cerr << "inertia diff: " << last_inertia << " - " <<  inertia << " = " << last_inertia - inertia << std::endl;
+            //std::cerr << "inertia diff: " << last_inertia << " - " <<  inertia << " = " << last_inertia - inertia << std::endl;
             return inertia;
 
 
@@ -278,15 +277,15 @@ namespace puffinn
                 calcDists(rd, c_i);
             }
             // debug
-            std::cerr << "Distances for entries" << std::endl;
-            show(rd.distances, N);
+            //std::cerr << "Distances for entries" << std::endl;
+            //show(rd.distances, N);
         }
 
         // Sets new centers according to average of
         // vectors belonging to the cluster
         void setNewCenters(struct RunData& rd) {
-            std::cerr << "setNewCentroids start" << std::endl;
-            showCentroids(rd.centroids);
+            //std::cerr << "setNewCentroids start" << std::endl;
+            //showCentroids(rd.centroids);
             // Average all centroids by the number of elements in cluster
             Dataset<RealVectorFormat> temp_sums(vector_len, K);
             std::copy(rd.sums[0], rd.sums[K-1] + vector_len, temp_sums[0]);
@@ -295,8 +294,8 @@ namespace puffinn
                 multiply_assign_float(temp_sums[c_i], 1.0/rd.counts[c_i], vector_len);
                 UnitVectorFormat::copy_from_float(rd.centroids[c_i], temp_sums[c_i], vector_len);
             }
-            std::cerr << "setNewCentroids end" << std::endl;
-            showCentroids(rd.centroids);
+            //std::cerr << "setNewCentroids end" << std::endl;
+            //showCentroids(rd.centroids);
         }
 
         void show(uint8_t * arr, size_t size) 

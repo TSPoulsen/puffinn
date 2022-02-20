@@ -22,8 +22,9 @@ add_executable(Test "test/main.cpp" "test/code.cpp")
 
 find_package(HDF5 COMPONENTS CXX)
 if (HDF5_FOUND)
-    add_executable(Quick "test/quick.cpp")
-    include_directories("${HDF5_CXX_INCLUDE_DIRS}")
+    add_executable(Quick "experiments/main.cpp")
+    target_include_directories(Quick PUBLIC "experiments/include")
+    target_include_directories(Quick PUBLIC "${HDF5_CXX_INCLUDE_DIRS}")
     target_link_libraries(Quick ${HDF5_CXX_LIBRARIES})
 endif()
 
