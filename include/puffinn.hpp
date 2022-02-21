@@ -7,4 +7,5 @@
 #include "puffinn/hash_source/independent.hpp"
 #include "puffinn/hash_source/tensor.hpp"
 #include "puffinn/hash_source/pool.hpp"
-//#include "puffinn/kmeans.hpp"
+#include "puffinn/pq_filter.hpp"
+#include "puffinn/kmeans.hpp"

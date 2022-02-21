@@ -15,7 +15,7 @@ namespace puffinn{
         Dataset<UnitVectorFormat> &dataset;
         std::vector<unsigned int> subspaceSizes, offsets = {0};
         public:
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int dims, unsigned int m = 16, unsigned int k = 256)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int dims, unsigned int m = 16, unsigned int k = 255)
         :M(m),
         dims(dims),
         K(k),
@@ -24,11 +24,23 @@ namespace puffinn{
             subspaceSizes.resize(M);
             fill(subspaceSizes.begin(), subspaceSizes.end(), dims/M);
             for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ dims/M);
+            createCodebook();
+            createDistanceTable();
         }
+        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int dims, std::vector<unsigned int> subs, unsigned int k = 255)
+        :M(subs.size()),
+        dims(dims),
+        K(k),
+        dataset(dataset)
+        {   
+            setSubspaceSizes(subs);
+            createCodebook();
+            createDistanceTable();
+        }
+        
         
         void setSubspaceSizes(std::vector<unsigned int> subs){
             subspaceSizes = subs;
-            M = subs.size();
             offsets.clear();
             for(unsigned int i = 1; i < M; i++) offsets[i] = subs[i-1] + offsets[i-1]; 
         }
@@ -123,9 +135,14 @@ namespace puffinn{
             }
             return sum;
         }
+        
         float asymmetricDistanceComputation(typename UnitVectorFormat::Type* x, typename UnitVectorFormat::Type* y){
-
-            return 0.0;
+            float sum = 0;
+            std::vector<uint8_t> py = getPQCode(y);
+            for(unsigned int m = 0; m <M; m++){
+                sum += UnitVectorFormat::distance(x + offsets[m], codebook[m][py[m]], subspaceSizes[m]);
+            }
+            return sum;
         }
 
         std::vector<float> getCentroid(unsigned int mID, unsigned int kID){
