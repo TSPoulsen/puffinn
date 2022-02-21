@@ -9,6 +9,7 @@
 
 #include "puffinn/format/generic.hpp"
 #include "puffinn/typedefs.hpp"
+#include "puffinn/math.hpp"
 
 namespace puffinn {
     // Bytes in a 256-bit vector
@@ -88,6 +89,13 @@ namespace puffinn {
                 storage[i] = to_16bit_fixed_point(0.0);
             }
         }
+
+        static float innerProduct(int16_t* lhs, int16_t* rhs, unsigned int dimensions) {
+            float dot = from_16bit_fixed_point(
+                dot_product_i16_simple(lhs, rhs, dimensions));
+            return dot; // Ensure the similarity is between 0 and 1.
+        }
+        
 
         static float distance(Type* p1, Type* p2, unsigned int dimensions) {
             float dist = 0;

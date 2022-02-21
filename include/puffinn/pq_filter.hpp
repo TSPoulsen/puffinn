@@ -52,7 +52,7 @@ namespace puffinn{
                 for(int k1 = 0; k1 < K; k1++){
                     std::vector<float> dists;
                     for(int k2 = 0; k2 < K; k2++){
-                        dists.push_back(UnitVectorFormat::distance(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
+                        dists.push_back(UnitVectorFormat::innerProduct(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
                     }
                     subspaceDists.push_back(dists);
                 }
@@ -140,7 +140,7 @@ namespace puffinn{
             float sum = 0;
             std::vector<uint8_t> py = getPQCode(y);
             for(unsigned int m = 0; m <M; m++){
-                sum += UnitVectorFormat::distance(x + offsets[m], codebook[m][py[m]], subspaceSizes[m]);
+                sum += UnitVectorFormat::innerProduct(x + offsets[m], codebook[m][py[m]], subspaceSizes[m]);
             }
             return sum;
         }
