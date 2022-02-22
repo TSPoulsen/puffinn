@@ -23,7 +23,9 @@ namespace puffinn{
         {
             subspaceSizes.resize(M);
             fill(subspaceSizes.begin(), subspaceSizes.end(), dims/M);
-            for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ dims/M);
+            unsigned int leftover = dims - ((dims/M) * M);
+            for(unsigned int i = 0; i < leftover; i++) subspaceSizes[i]++;
+            for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ subspaceSizes[i-1]);
             createCodebook();
             createDistanceTable();
         }
