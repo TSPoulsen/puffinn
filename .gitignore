@@ -1,6 +1,8 @@
 
-# Data directory
+# Data directory and result files that are too large
 data/
+experiments/results/glove-25-100k-100.hdf5
+
 
 # vim
 *.swp
