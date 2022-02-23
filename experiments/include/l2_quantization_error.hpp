@@ -15,7 +15,7 @@ void l2_quant_error()
     std::pair<int,int> data_dimensions = utils::load(train, "train");
     t.start();
     // Code to be timed here
-    puffinn::PQFilter filter(train, data_dimensions.second, 5, (unsigned char) 255);
+    puffinn::PQFilter filter(train, 5, 256);
 
     std::cerr << "Calculating results" << std::endl;
     float results[data_dimensions.first];

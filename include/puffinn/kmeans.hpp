@@ -5,333 +5,384 @@
 #include "puffinn/math.hpp"
 
 #include <vector>
+#include <cassert>
 #include <iostream>
 #include <algorithm>
+#include <array>
 #include <random>
 #include <unordered_set>
 #include <cfloat>
 
+#if defined(__AVX2__) || defined(__AVX__)
+    #include <immintrin.h>
+#endif
+
 namespace puffinn
 {
-    // TODO:
-    // Handling of other data-formats
-    // Investigate parallelization within the clustering for performance gain
-    // Implement kmeans++ center initilization algorithm 
-    // Manage padding when using avx2 and vectors are divided into M sections
-
     /// Class for performing k-means clustering on a given dataset
     class KMeans
     {
-        struct RunData {
-            Dataset<UnitVectorFormat> centroids;
-            Dataset<RealVectorFormat> sums;
-            unsigned int* counts;
-            uint8_t* labels;
-            float* distances;
-            const size_t N;
-
-            RunData(size_t N, size_t K, size_t vector_len)
-            : centroids(vector_len, K),
-              sums(vector_len, K),
-              N(N)
-            {
-                counts = new unsigned int[K] {};
-                labels = new uint8_t[N] {};
-                distances = new float[N];
-                resetDists();
-            }
-
-            ~RunData() {
-                delete[] counts;
-                delete[] labels;
-                delete[] distances;
-            }
-            inline void resetDists() {
-                std::fill_n(distances, N, FLT_MAX);
+    public:
+        struct Cluster {
+            std::vector<float> centroid;
+            std::vector<unsigned int> members;
+            Cluster(){}
+            Cluster(const Cluster &c1){
+                centroid = c1.centroid;
+                members = c1.members;
             }
         };
+        enum distanceType {euclidean, mahalanobis, none};
+    private:
 
-        static constexpr float TOL = 0.0001f;
-        static const uint16_t MAX_ITER = 100;
-        static const unsigned int N_RUNS = 3;
+        using dataType = std::vector<std::vector<float>>;
 
-        const uint8_t K;
-        const size_t N;
-        const size_t vector_len;
-        unsigned int offset = 0;
-        // reference to data contained in Index instance
+        // Clustering configuration
+        unsigned int padding = 0;
+        const unsigned int K;
+        const float TOL;
+        const uint16_t MAX_ITER;
+        const unsigned int N_RUNS;
+        std::vector<float> covarianceMatrix;
+        distanceType MODE;
+
         // gb_centroids is for the global best set of centroids
-        Dataset<UnitVectorFormat> &dataset,
-                          gb_centroids;
-
-        uint8_t *gb_labels;
-
-
+        std::vector<Cluster> gb_clusters;
         float gb_inertia = FLT_MAX;
+        unsigned int padding = 0;
 
     public:
-        KMeans(Dataset<UnitVectorFormat> &dataset, uint8_t K_clusters)
+        KMeans(unsigned int K_clusters = 256, distanceType mode = euclidean, unsigned int runs = 3, unsigned int max_iter = 100, float tol = 0.0001f)
             : K(K_clusters),
-              N(dataset.get_size()),
-              vector_len(dataset.get_description().storage_len),
-              dataset(dataset),
-              gb_centroids(vector_len, K)
+            TOL(tol),
+            MAX_ITER(max_iter),
+            N_RUNS(runs),
+            MODE(mode)
         {
-            std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << std::endl;
-            gb_labels = new uint8_t[N];
-        }
-        KMeans(Dataset<UnitVectorFormat> &dataset, uint8_t K_clusters,unsigned int offset, unsigned int subspaceSize)
-            : K(K_clusters),
-              N(dataset.get_size()),
-              vector_len(subspaceSize),
-              offset(offset),
-              dataset(dataset),
-              gb_centroids(vector_len, K)
-        {
-            std::cerr << "Kmeans info: \tN=" << N << "\tK=" << (unsigned int)K << "\toffset=" << offset << "\tsubspaceSize=" << subspaceSize << std::endl;
-            gb_labels = new uint8_t[N];
+            assert(K <= 256);
+            std::cerr << "Kmeans info: tK=" << (unsigned int)K << std::endl;
         }
 
-        ~KMeans() 
+        ~KMeans() {}
+
+        void fit(dataType &data)
         {
-            delete[] gb_labels;
-        }
-        void fit(unsigned int runs = N_RUNS, unsigned int max_iter = MAX_ITER)
-        {
+            // add padding to make each vector a multiple of 8
+            padData(data);
+
+            if (MODE == mahalanobis){
+                createCovarianceMatrix(data);
+            }
+
             //clean up for next subspace fit
             gb_inertia = FLT_MAX;
             // init_centers_random(); doesn't work
-            for(unsigned int run=0; run < runs; run++) {
-                std::cerr << "Run " << run+1 << "/" << runs << std::endl;
-                struct RunData rd(N, K, vector_len);
-                float run_inertia = single_kmeans(rd, max_iter);
+            for(unsigned int run=0; run < N_RUNS; run++) {
+                std::cerr << "Run " << run+1 << "/" << N_RUNS << std::endl;
+                std::vector<Cluster> clusters = init_centroids_kpp(data);
+                float run_inertia = lloyd(data, clusters);
                 if (run_inertia < gb_inertia) {
-                    // New run is the currently best, thus overwrite gb variables
+                    //New run is the currently best, thus overwrite gb variables
+                    std::cout << "assigning new gb_clusters" << std::endl;
                     gb_inertia = run_inertia;
-                    gb_centroids = rd.centroids; // Copies the whole Class 
-                    std::copy(rd.labels, rd.labels+N, gb_labels);
+                    gb_clusters =  clusters; // Copies the whole Class 
                 }
+            }
+
+
+        }
+
+        std::vector<float> getCentroid(size_t c_i) {
+            // Removes padding from centroid
+            return std::vector<float>(&*gb_clusters[c_i].centroid.begin(), &*gb_clusters[c_i].centroid.end()-padding);
+        }
+
+        dataType getAllCentroids(){
+            dataType all_centroids(K);
+            for (unsigned int c_i = 0; c_i < K; c_i++){
+                all_centroids[c_i] = getCentroid(c_i);
+            }
+            return all_centroids;
+        }
+
+        std::vector<float> getCovarianceMatrix(){
+            return covarianceMatrix;
+        }
+
+        //pointers to the actual start should be given i.e. offset should be handled outside this function
+        double distance(std::vector<float> &v1, std::vector<float> &v2){
+
+            if(MODE == euclidean){
+                return sumOfSquares(v1, v2);
+            }
+            
+            if(MODE == mahalanobis){
+                return mahaDistance(v1,v2);
             }
         }
 
-        typename UnitVectorFormat::Type* getCentroid(size_t c_i) {
-            return gb_centroids[c_i];
-        }
-
-        Dataset<UnitVectorFormat> getAllCentroids(){
-            Dataset<UnitVectorFormat> tmp(vector_len, K);
-            tmp = gb_centroids;
-            return tmp;
-        }
-
-        uint8_t * getLabels(){
-            return gb_labels;
-        }
-
-    private:
-
-        float single_kmeans(struct RunData& rd, unsigned int max_iter)
+        double mahaDistance(std::vector<float> &v1, std::vector<float> &v2)
         {
-            //std::cerr << "single_kmeans called" << std::endl;
-            // init_centers_random(); doesn't work
-            init_centroids_kpp(rd);
-            return lloyd(rd, max_iter);
+                //std::cerr << "Maha distance being computed" << std::endl;
+                std::vector<float> delta(v1.size());
+                for(unsigned int d = 0; d < v1.size(); d++){
+                    delta[d] = v1[d] - v2[d];
+                }
+
+                // Use SIMD HERE
+                std::vector<float> temp(v1.size(), 0);
+                for(unsigned int d = 0; d < v1.size(); d++){
+                    for(unsigned int delta_i = 0; delta_i < v1.size(); delta_i++){
+                        temp[d] += delta[delta_i] * covarianceMatrix[(v1.size() * delta_i) + d]; 
+                    }    
+                }
+
+                double distance = 0.0;
+                for(unsigned int delta_i = 0; delta_i < v1.size(); delta_i++){
+                    distance += ((double) delta[delta_i]) * ((double) temp[delta_i]);
+                }
+                return distance;                
+
 
         }
+
+        double totalError(dataType &data, distanceType mode = none) {
+            padData(data);
+            if (mode == none) {
+                mode = MODE;
+            }
+            //double (KMeans::* d_ptr)(std::vector<float>&, std::vector<float>&);
+            //if (mode == euclidean) d_ptr = &KMeans::sumOfSquares;
+            //if (mode == mahalanobis) d_ptr = &KMeans::mahaDistance;
+            double total_err = 0;
+            for (Cluster &c : gb_clusters) {
+                for (unsigned int idx : c.members) {
+                    if (mode == euclidean)        total_err += sumOfSquares(data[idx], c.centroid);
+                    else if (mode == mahalanobis) total_err += mahaDistance(data[idx], c.centroid);
+                    //total_err += (*d_ptr)(data[idx], c.centroid);
+                }
+                std::cerr << std::endl;
+            }
+            std::cerr << std::endl << std::endl;
+            return total_err;
+            
+
+        }
+
+        void createCovarianceMatrix(dataType &data){
+            covarianceMatrix.resize(data[0].size()*data[0].size());
+            // Use SIMD
+
+            //build covariance matrix by covariance[x][y] = avg((xi * yi))
+            //std::cerr << "covariance matrix addition part begin" << std::endl;
+            for(unsigned int i = 0;  i < data.size(); i++){
+                for(unsigned int d1= 0; d1 < data[0].size(); d1++){
+                    for(unsigned int d2 = 0; d2 < data[0].size(); d2++){  
+                        covarianceMatrix[(data[0].size() * d1) + d2] += data[i][d1] * data[i][d2];
+                    }
+                }
+                //std::cerr << "finished with vector: " << i << std::endl;
+            }
+            //std::cerr  << "covariance matrix addition part finished" << std::endl;
+            //get average by deviding by n 
+            for(unsigned int cov = 0; cov < (data[0].size()*data[0].size()); cov++){
+                covarianceMatrix[cov] /= (data.size());
+            }
+            //std::cerr << "division of covariance matrix finished" << std::endl;
+        }
+
+
+
+        // Performs a single kmeans clustering using the lloyd algorithm
+        float lloyd(dataType &data, std::vector<Cluster> &clusters) 
+        {
+            double inertia_delta = DBL_MAX;
+            double inertia = DBL_MAX;
+            unsigned int iteration = 0;
+
+            while (inertia_delta > TOL && iteration < MAX_ITER )
+            {
+                //std::cerr << "\tlloyd iteration: " << iteration;
+                double current_inertia = assignToClusters(data, clusters);
+                for (auto cit = clusters.begin(); cit != clusters.end(); cit++) {
+                    setCentroidMean(data, *cit);
+                }
+
+                inertia_delta = (inertia - current_inertia);
+                inertia = current_inertia;
+                iteration++;
+            }
+            return inertia;
+
+        }
+
+    #ifdef __AVX__
+        // Adds padding such that each vector is a multiple of 8
+        void padData(dataType &data) {
+            padding = 8 - (data[0].size() % 8);
+            if (padding == 8) return; // Already correct size
+            for (std::vector<float> &vec : data) {
+                for (unsigned int p = 0; p < padding; p++) {
+                    vec.push_back(0);
+                }
+            }
+
+        }
+    #else
+        void padData(dataType &data) {} // only pad data when using avx instructions
+    #endif
+
         // samples K random points and uses those as starting centers
-        void init_centers_random(Dataset<UnitVectorFormat> &cen)
+        std::vector<Cluster> init_centroids_random(dataType &data)
         {
-            // Try using kmeans++ initialization algorithm
-            //std::cerr << "Init random centers" << std::endl;
+            std::vector<Cluster> clusters(K);
+            std::cerr << "Init random centers" << std::endl;
             auto &rand_gen = get_default_random_generator();
-            std::uniform_int_distribution<unsigned int> random_idx(0, N-1);
+            std::uniform_int_distribution<unsigned int> random_idx(0, data.size()-1);
 
-            int8_t c_i = 0;
+            unsigned int c_i = 0;
             std::unordered_set<unsigned int> used;
+            std::cerr << "BLYat" << std::endl;
             while(c_i < K) {
+                std::cerr << "k" << std::endl;
                 unsigned int sample_idx = random_idx(rand_gen);
                 if (used.find(sample_idx) == used.end()) {
                     used.insert(sample_idx);
-                    typename UnitVectorFormat::Type* sample = dataset[sample_idx];
-                    std::copy(sample, sample + vector_len, cen[c_i]);
-                    c_i++;
+                    clusters[c_i++].centroid = data[sample_idx];
                 }
             }
+            return clusters;
+
         }
+
+    // sumOfSquares heavily inspired from https://github.com/yahoojapan/NGT/blob/master/lib/NGT/Clustering.h
+    #ifdef __AVX2__
+        double sumOfSquares(std::vector<float> &v1, std::vector<float> &v2)
+        {
+            __m256 sum = _mm256_setzero_ps();
+            float *a = &v1[0];
+            float *b = &v2[0];
+            float *a_end = &v1[v1.size()];
+            while (a != a_end) {
+                __m256 v = _mm256_sub_ps(_mm256_loadu_ps(a), _mm256_loadu_ps(b));
+                sum = _mm256_add_ps(sum, _mm256_mul_ps(v, v));
+                a += 8;
+                b += 8;
+            }
+
+            __attribute__((aligned(32))) float f[8];
+            _mm256_store_ps(f, sum);
+            double s = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7];
+            return s;
+        }
+    #else
+        double sumOfSquares(std::vector<float> &v1, std::vector<float> &v2)
+        {
+
+            double csum = 0.0;
+            float *a = &v1[0];
+            float *b = &v2[0];
+            float *a_end = &v1[v1.size()];
+            while (a != a_end) {
+                double d = (double)*a++ - (double)*b++;
+                csum += d * d;
+            }
+            return csum;
+        }
+    #endif
 
         // Kmeans++ initialization of centroids
-        void init_centroids_kpp(struct RunData& rd)
+        std::vector<Cluster> init_centroids_kpp(dataType &data)
         {
-            //showCentroids(rd.centroids);
-            firstCentroid(rd);
-            // 1 centroid is chosen
-            for (size_t c_i = 1; c_i < K; c_i++) {
-                // pick vector based on distances
-                int vec = weightedRandomSTD(rd.distances);
-                // copy vector to centriod
-                std::copy(dataset[vec]+offset, dataset[vec]+offset + vector_len, rd.centroids[c_i]);
-                // compute all distances again
-                calcDists(rd, c_i);
-            }
-            //showCentroids(rd.centroids);
-
-        }
-
-        void firstCentroid(struct RunData& rd)
-        {
-            // Pick random centroid uniformly
+            std::vector<Cluster> clusters(K);
+            // Pick first centroids uniformly
             auto &rand_gen = get_default_random_generator();
-            std::uniform_int_distribution<unsigned int> random_idx(0, N-1);
-            unsigned int sample_idx = random_idx(rand_gen);
-            std::copy(dataset[sample_idx]+offset, dataset[sample_idx]+offset + vector_len, rd.centroids[0]);
-            // Calc all distances to this centroid
-            for (size_t i = 0; i < N; i++) {
-                float dist = UnitVectorFormat::distance(dataset[i]+offset, rd.centroids[0], vector_len);
-                rd.distances[i] = dist;
-                UnitVectorFormat::add_assign_float(rd.sums[0], dataset[i]+offset, vector_len);
-                rd.counts[0]++;
-                rd.labels[i] = 0;
-            }            
-        }
-        
-        int weightedRandomSTD(float * distances)
-        {       
-            auto &rand_gen = get_default_random_generator();
-            std::discrete_distribution<int> rng(distances, distances+N);
-            float rn = rng(rand_gen);
-            return rn;
-        }
+            std::uniform_int_distribution<unsigned int> random_idx(0, data.size()-1);
+            clusters[0].centroid = data[random_idx(rand_gen)];
 
-        // Performs a single kmeans clustering 
-        // centroids are set to the member centroids
-        // Using the lloyd algorithm for clustering
-        float lloyd(struct RunData& rd, unsigned int max_iter) {
-
-            float inertia = FLT_MAX, last_inertia;
-            uint16_t iteration = 0;
-
-            do
-            {
-                rd.resetDists();
-                //std::cerr << "\tlloyd iteration: " << iteration;
-                last_inertia = inertia;
-                setLabels(rd);
-                inertia = calcInertia(rd.distances);
-                //std::cerr << " with inertia: " << inertia << std::endl;
-                //show(rd.labels, N);
-                setNewCenters(rd);
-                iteration++;
-
-            } while ((last_inertia-inertia) > TOL && iteration < max_iter );
-            
-            //std::cerr << "inertia diff: " << last_inertia << " - " <<  inertia << " = " << last_inertia - inertia << std::endl;
-            return inertia;
-
-
-        }
-
-        float calcInertia(float * distances)
-        {
-            float inertia = 0;
-            for (size_t i = 0; i < N; i++) {
-                inertia += distances[i];
-            }
-            return inertia;
-        }
-        // Calculates distances for all vectors to given centroid
-        // Sets results in distances argument
-        void calcDists(struct RunData& rd, size_t c_i) 
-        {
-            // for every data entry
-            for (size_t i = 0; i < N; i++) {
-                float dist = UnitVectorFormat::distance(dataset[i]+offset, rd.centroids[c_i], vector_len);
-                if (dist < rd.distances[i]) {
-                    updateState(rd, i, c_i);
-                    rd.distances[i] = dist;
+            // Choose the rest proportional to their distance to already chosen centroids
+            std::vector<double> distances(data.size(), DBL_MAX);
+            for (unsigned int c_i = 1; c_i < K; c_i++) {
+                //calculate distances to last chosen centroid
+                for (unsigned int i = 0; i < data.size(); i++) {
+                    double new_dist = sumOfSquares(data[i], clusters[c_i-1].centroid);
+                    distances[i] = std::min(distances[i], new_dist);
                 }
 
+                std::discrete_distribution<int> rng(distances.begin(), distances.end());
+                clusters[c_i].centroid = data[rng(rand_gen)];
             }
-
+            return clusters;
         }
 
-        // Update Label for vector
-        // update centroids sums for both old centroids and new assigned centroid
-        // update counts for both centroids as well
-        // i: index for vector
-        // c_i: index for centroid
-        void updateState(struct RunData& rd, size_t i, size_t c_i)
+
+        // Sets the labels for all vectors, and returns inertia
+        double assignToClusters(dataType &data, std::vector<Cluster> &clusters)
         {
-            if (rd.labels[i] == c_i) return;
-            UnitVectorFormat::subtract_assign_float(rd.sums[rd.labels[i]], dataset[i]+offset, vector_len);
-            UnitVectorFormat::add_assign_float(rd.sums[c_i], dataset[i]+offset, vector_len);
-            rd.counts[rd.labels[i]]--;
-            rd.counts[c_i]++;
-            rd.labels[i] = c_i;
-            return;
-
-        }
-
-        // Sets the labels for all vectors 
-        void setLabels(struct RunData& rd) {
-            for (size_t c_i = 0; c_i < K; c_i++) {
-                calcDists(rd, c_i);
+            // Clear member variable for each cluster
+            for (auto cit = clusters.begin(); cit != clusters.end(); cit++) {
+                (*cit).members.clear();
             }
-            // debug
-            //std::cerr << "Distances for entries" << std::endl;
-            //show(rd.distances, N);
-        }
 
-        // Sets new centers according to average of
-        // vectors belonging to the cluster
-        void setNewCenters(struct RunData& rd) {
-            //std::cerr << "setNewCentroids start" << std::endl;
-            //showCentroids(rd.centroids);
-            // Average all centroids by the number of elements in cluster
-            Dataset<RealVectorFormat> temp_sums(vector_len, K);
-            std::copy(rd.sums[0], rd.sums[K-1] + vector_len, temp_sums[0]);
-            for (size_t c_i = 0; c_i < K; c_i++) {
-                // divide all sums by the count of vectors in cluster
-                multiply_assign_float(temp_sums[c_i], 1.0/rd.counts[c_i], vector_len);
-                UnitVectorFormat::copy_from_float(rd.centroids[c_i], temp_sums[c_i], vector_len);
+            double inertia = 0;
+
+            for (unsigned int i = 0; i < data.size(); i++) {
+                double min_dist = DBL_MAX;
+                unsigned int min_label = data.size() + 1;
+                for (unsigned int c_i = 0; c_i < K; c_i++) {
+                    double d = distance(data[i], clusters[c_i].centroid);
+                    if (d < min_dist) {
+                        min_label = c_i;
+                        min_dist = d;
+                    }
+                }
+                clusters[min_label].members.push_back(i);
+                inertia += min_dist;
             }
-            //std::cerr << "setNewCentroids end" << std::endl;
-            //showCentroids(rd.centroids);
+            // Handle emtpy cluster
+            return inertia;
         }
 
-        void show(uint8_t * arr, size_t size) 
+    #ifdef __AVX__
+        void setCentroidMean(dataType &data, Cluster &c)
         {
-            for (size_t i = 0; i < size; i++) {
-                std::cerr << (unsigned int)arr[i] << " ";
+            unsigned int n256 = data[0].size()/8;
+            __m256 sum[n256];
+            for (unsigned int n = 0; n < n256; n++) {
+                sum[n] = _mm256_setzero_ps();
             }
-            std::cerr << std::endl;
+            for (unsigned int idx : c.members) {
+                float *a = &data[idx][0];
+                for (unsigned int n = 0; n < n256; n++, a+=8) {
+                    sum[n] = _mm256_add_ps(sum[n], _mm256_loadu_ps(a));
+                }
+            }
+            assert(c.members.size() != 0);
+            float div = 1.0/c.members.size();
+            alignas(32) float div_a[8] = {div, div, div, div, div, div, div, div};
+            __m256 div_v = _mm256_load_ps(div_a);
+            float *cen_s = &c.centroid[0];
+            for (unsigned int n = 0; n < n256; n++, cen_s += 8) {
+                _mm256_storeu_ps(cen_s,
+                    _mm256_mul_ps(sum[n], div_v));
+            }
         }
-
-        void show(typename UnitVectorFormat::Type* arr, size_t size) 
+    #else
+        void setCentroidMean(dataType &data, Cluster &c)
         {
-            for (size_t i = 0; i < size; i++) {
-                std::cerr << UnitVectorFormat::from_16bit_fixed_point(arr[i]) << " ";
-            }
-            std::cerr << std::endl;
-        }
 
-        void show(float* arr, size_t size) 
-        {
-            for (size_t i = 0; i < size; i++) {
-                std::cerr << arr[i] << " ";
+            fill(c.centroid.begin(), c.centroid.end(), 0.0f);
+            for (unsigned int idx : c.members) {
+                for (unsigned int d = 0; d < c.centroid.size(); d++) {
+                    c.centroid[d] += data[idx][d];
+                }
             }
-            std::cerr << std::endl;
-        }
-
-        void showCentroids()
-        {
-            showCentroids(gb_centroids);
-        }
-
-        void showCentroids(Dataset<UnitVectorFormat> &cen) {
-            for (size_t c_i = 0; c_i < K; c_i++) {
-                std::cerr << "Centroid " << c_i << ": ";
-                show(cen[c_i], vector_len);
+            assert(c.members.size() != 0);
+            for (unsigned int d = 0; d < c.centroid.size(); d++) {
+                c.centroid[d] /= c.members.size();
             }
+
         }
+    #endif
     };
 }

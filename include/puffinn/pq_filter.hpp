@@ -1,5 +1,4 @@
 #pragma once
-
 #include "puffinn/dataset.hpp"
 #include "puffinn/kmeans.hpp"
 #include <vector>
@@ -15,9 +14,9 @@ namespace puffinn{
         Dataset<UnitVectorFormat> &dataset;
         std::vector<unsigned int> subspaceSizes, offsets = {0};
         public:
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int dims, unsigned int m = 16, unsigned int k = 255)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 16, unsigned int k = 256)
         :M(m),
-        dims(dims),
+        dims(dataset.get_description().args),
         K(k),
         dataset(dataset)
         {
@@ -29,7 +28,7 @@ namespace puffinn{
             createCodebook();
             createDistanceTable();
         }
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int dims, std::vector<unsigned int> subs, unsigned int k = 255)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256)
         :M(subs.size()),
         dims(dims),
         K(k),
@@ -63,6 +62,18 @@ namespace puffinn{
 
         }
 
+        std::vector<std::vector<float>> getSubspace(unsigned int m) {
+            unsigned int N = dataset.get_size();
+            std::vector<std::vector<float>> subspace(N, std::vector<float>(subspaceSizes[m]));
+            for (unsigned int i = 0; i < N; i++) {
+                UnitVectorFormat::Type *start = dataset[i] + offsets[m];
+                for (unsigned int d = 0; d < subspaceSizes[m]; d++) {
+                    subspace[i][d] = UnitVectorFormat::from_16bit_fixed_point(*(start + d));
+                    
+                }
+            }
+            return subspace;
+        }
 
 
         //Runs kmeans for all m subspaces and stores the centroids in codebooks
@@ -73,9 +84,19 @@ namespace puffinn{
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
-                KMeans kmeans(dataset, K, offsets[m], subspaceSizes[m]); 
-                kmeans.fit();
-                codebook.push_back(kmeans.getAllCentroids());
+                KMeans kmeans(K); 
+                std::vector<std::vector<float>> subspace = getSubspace(m);
+                kmeans.fit(subspace);
+                std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
+                // Convert back to UnitVectorFormat and store in codebook
+                codebook.push_back(Dataset<UnitVectorFormat>(subspaceSizes[m], dataset.get_size()));
+                for (unsigned int i = 0; i < dataset.get_size(); i++) {
+                    UnitVectorFormat::Type *c_p = codebook[m][i];
+                    float *vec_p = &centroids[i][0];
+                    for (unsigned int d = 0; d < subspaceSizes[m]; d++) {
+                        *c_p++ = UnitVectorFormat::from_16bit_fixed_point(*vec_p++);
+                    }
+                }
                 
             }
             //showCodebook();
@@ -145,9 +166,9 @@ namespace puffinn{
         
         float asymmetricDistanceComputation(typename UnitVectorFormat::Type* x, typename UnitVectorFormat::Type* y){
             float sum = 0;
-            std::vector<uint8_t> py = getPQCode(y);
+            std::vector<uint8_t> px = getPQCode(x);
             for(unsigned int m = 0; m <M; m++){
-                sum += UnitVectorFormat::innerProduct(x + offsets[m], codebook[m][py[m]], subspaceSizes[m]);
+                sum += UnitVectorFormat::innerProduct(y + offsets[m], codebook[m][px[m]], subspaceSizes[m]);
             }
             return sum;
         }

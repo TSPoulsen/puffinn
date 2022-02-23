@@ -51,6 +51,8 @@ namespace utils {
         int n = data_dims[0], dim = data_dims[1];
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         std::valarray<float> temp(n * dim);
+        n = 1000;
+        dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
         if (n > max_size) n = max_size;
         for (int i = 0; i < n; i++ ) {

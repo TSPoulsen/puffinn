@@ -23,7 +23,7 @@ namespace pq{
         for (auto entry: data){
             dataset.insert(entry);
         }
-        PQFilter pq1(dataset,dims, m,k);
+        PQFilter pq1(dataset, m,k);
         pq1.createCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
@@ -42,7 +42,7 @@ namespace pq{
         for (auto entry: data){
             dataset.insert(entry);
         }
-        PQFilter pq1(dataset,dims, m,k);
+        PQFilter pq1(dataset, m,k);
         pq1.createCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
@@ -64,7 +64,7 @@ namespace pq{
         for (auto entry: data){
             dataset.insert(entry);
         }
-        PQFilter pq1(dataset,dims, m,k);
+        PQFilter pq1(dataset, m,k);
         pq1.createCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes

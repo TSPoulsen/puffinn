@@ -46,7 +46,7 @@ void ang_dist_glove_subset()
         std::cerr << "RUN M=" << m << std::endl;
         std::ostringstream ss; ss << m << "m";
         H5::Group *grp = new H5::Group(file->createGroup(ss.str()));
-        puffinn::PQFilter filter(train, train_dim.second, m, (unsigned char) 255);
+        puffinn::PQFilter filter(train, m, 256);
 
         // calculate asymmetric distance
         for (int j = 0; j < test_dim.first; j++) {

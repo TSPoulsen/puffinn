@@ -21,9 +21,9 @@ Format for PQ:
 - We have to determine threshholds for when data entries are added to the buffer, at least for the sketch distances, not sure how we will handle the stopping criterion
 
 #### TODO:
-- [ ] Begin implementation of naive PQ with both euclidean dist optimization and mahalanobis dist. ~ 
+- [x] Begin implementation of naive PQ with both euclidean dist optimization and mahalanobis dist. ~ 
   - [x] Euclidean
-  - [ ] Mahalanobis
+  - [x] Mahalanobis
 - [x] Create Distance table and implement asymmetric and symmetric distance estimator
   - [x] Symmetric
   - [x] Asymmetric
@@ -32,7 +32,7 @@ Format for PQ:
   - [x] Compute offsets once 
 - [x] Implement simple PQ Code function
 - [x] Do not store PQ codes explicitly
-- [x] deciding sizes when $d/M \mod 2 \ne 0$ (**VIKTOR**) -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
+- [x] deciding sizes when $d/M \mod 2 \ne 0$ -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
 - [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
 - [x] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
   - [x] Kmeans
@@ -41,8 +41,10 @@ Format for PQ:
 - [ ] Begin writing formal problem definition of ANN
 - [x] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
 - [ ] Look at previous bsc. projects of what is included and to what level of expertize.
-- [ ] Use Float inside kmeans instead of UnitVectorFormat (can be better optimized and shouldn't be a problem for space usage) 
-  - [ ] Get SIMD  to work for subspaces
+- [x] Use Float inside kmeans instead of UnitVectorFormat (can be better optimized and shouldn't be a problem for space usage) 
+  - [x] Get SIMD  to work for subspaces
+  - [ ] Use SIMD in mahalanobis distance
+- [ ] Run experiments and gather data
 
 
 
@@ -57,24 +59,42 @@ Format for PQ:
 
 
 
-### Agenda for meeting (16/02)
+### Agenda for meeting (8/03)
+#### Done since last meeting
+- Implement mahalanobis
+- Use float instead of vectors in kmeans
+- Use avx2 instructions where possible (dont fully done - mahalanobis)
+- 
 #### Current to do
-- built simple test suite to test correctness (*Tim*)
-- Move from general TFormat to Unit Vector
-- Finish First iteration of PQ (distance between pqcode and q-point)
-- Writing broad scope parts of paper (*Viktor*) (not important)
-
-#### what next
+- Make mahalanobis test
+- Make explicit where padding is done, how and why.
+- Run experiments with both mahalnobis and 
+- Gather some results and create simple plots
+- Integrate into puffinn for querying
   - boot strapping for treshold values
-  - get SIMD to work/Optimizing
-  - Begin integrating our current solution in the Puffinn pipeline 
+  - Investigate the usefullness of SIMD when querying (for creating distance table and how lookup is done)
+- Perhaps next week should be code review? not sure we have data to discuss yet
+- Maybe postpone writing until we are away
+- Use SIMD in mahalanobis 
 
-#### Questions
-- Current Idea for optimizing simd involves adding single point dimensions (In theory it shouldn't mess with correctness?)
-- Should we worry about precomputing/exstra-space
-- How much should we focus on good code practices vs performance
+#### Issues/Questions
+- HPC is 10x slower than my own laptop?
+- A lot of code is heavily inspired by NGT, how should I declare this?
+- Creating a test for mahalanobis distance is more difficult than we thought. No existing framework does this, and paper has not released source code
+
+### Conclusion from meeting
+- nanoBench for benchmarking see https://github.com/Cecca/puffinn/blob/master/bench/bench.cpp
+- Make maha test which performs both euclidean and maha on data and see that whichever is optimized for gives lowest error rate (compare maha error when optimizing for euclidean to when optimizing for maha dist)
+- Make simple test that checks that maha distance (isolated) is correct
+- Try using cluster again if still slow ask lottie, as it shouldn't be slower
+- Remmeber to refer to NGT both in code and in paper
+- Maha dist (intuitively) should give lower PQ errors when the data is correlated, and on uncorrelated data it should be exactly the same as euclidean.
+
+
+
  
-nanoPQ
-Look more into alignment
-Just find best parameters and optimizae for those
-Gerneral -> optimize 
+### Notes from previous Meetings
+nanoPQ  
+Look more into alignment  
+Just find best parameters and optimize for those  
+General -> optimize 
