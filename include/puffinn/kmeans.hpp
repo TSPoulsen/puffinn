@@ -38,7 +38,6 @@ namespace puffinn
         using dataType = std::vector<std::vector<float>>;
 
         // Clustering configuration
-        unsigned int padding = 0;
         const unsigned int K;
         const float TOL;
         const uint16_t MAX_ITER;
