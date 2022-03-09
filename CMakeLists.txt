@@ -22,10 +22,26 @@ add_executable(Test "test/main.cpp" "test/code.cpp")
 
 find_package(HDF5 COMPONENTS CXX)
 if (HDF5_FOUND)
+    include(FetchContent)
+
+    FetchContent_Declare(
+
+        nanobench
+
+        GIT_REPOSITORY https://github.com/martinus/nanobench.git
+
+        GIT_TAG v4.1.0
+
+        GIT_SHALLOW TRUE)
+
+
+    FetchContent_MakeAvailable(nanobench)
+    
     add_executable(Quick "experiments/main.cpp")
     target_include_directories(Quick PUBLIC "experiments/include")
     target_include_directories(Quick PUBLIC "${HDF5_CXX_INCLUDE_DIRS}")
     target_link_libraries(Quick ${HDF5_CXX_LIBRARIES})
+    target_link_libraries(Quick nanobench)
 endif()
 
 if (OpenMP_FOUND)
@@ -33,3 +49,4 @@ if (OpenMP_FOUND)
 endif()
 
 add_subdirectory(docs)
+

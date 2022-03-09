@@ -32,10 +32,11 @@ namespace utils {
 
     // This code is 'inspired' by https://github.com/Cecca/running-experiments/blob/master/datasets.hpp
     template<typename TFormat>
-    std::pair<int, int> load(puffinn::Dataset<TFormat>& dataset, std::string set, std::string path = DEFAULT_HDF5_FILE, int max_size = INT_MAX) {
+    std::pair<int, int> load(puffinn::Dataset<TFormat>& dataset, std::string set, std::string path = DEFAULT_HDF5_FILE, int max_size = INT_MAX) 
+    {
 
         // Open the file and get the dataset
-        std::cerr << "LOADING FILE" << std::endl;
+        //std::cerr << "LOADING FILE" << std::endl;
         H5::H5File file(path, H5F_ACC_RDONLY);
         H5::Group group = file.openGroup("/");
         H5::DataSet h5_dataset = group.openDataSet(set);
@@ -51,7 +52,6 @@ namespace utils {
         int n = data_dims[0], dim = data_dims[1];
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         std::valarray<float> temp(n * dim);
-        n = 1000;
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
         if (n > max_size) n = max_size;
@@ -59,8 +59,26 @@ namespace utils {
             std::vector<float> vec(&temp[i*dim], &temp[(i+1)*dim]);
             dataset.insert(vec);
         }
-        std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
+        //std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
         return std::make_pair(n, dim);;
+    }
+
+    // Load dataset into vector of vectors but have it normalized by loading it into a Dataset<UnitVectorFormat> first
+    std::pair<int, int> load(std::vector<std::vector<float>> &data, std::string set, std::string path = DEFAULT_HDF5_FILE, int max_size = INT_MAX)
+    {
+        puffinn::Dataset<puffinn::UnitVectorFormat> p_data(0, 0);
+        auto dims = load<puffinn::UnitVectorFormat>(p_data, set, path, max_size);
+
+        data.clear();
+        data.resize(dims.first);
+        for(unsigned int i = 0; i < dims.first; i++) {
+            data[i].resize(dims.second);
+            for (unsigned int d = 0; d < dims.second; d++) {
+                data[i][d] = puffinn::UnitVectorFormat::from_16bit_fixed_point(*(p_data[i] + d));
+            }
+        }
+        //std::cout << "DONE LOADING IN VECTOR" << std::endl;
+        return dims;
     }
 
 }

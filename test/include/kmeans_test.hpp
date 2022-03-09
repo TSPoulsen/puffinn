@@ -21,50 +21,50 @@ namespace kmeans {
 
     bool are_approx_equal(std::set<std::vector<float>> run_answer, std::set<std::vector<float>> real_answer)
     {
-        std::cout << "run_anwsers size: " << (run_answer).size() << " actual anwsers size: " << (real_answer).size() << std::endl;
-        std::cout << "run_anwsers dim: " << (*(run_answer.begin())).size() << " actual anwsers dim: " << (*(real_answer.begin())).size() << std::endl;
+        //std::cout << "run_anwsers size: " << (run_answer).size() << " actual anwsers size: " << (real_answer).size() << std::endl;
+        //std::cout << "run_anwsers dim: " << (*(run_answer.begin())).size() << " actual anwsers dim: " << (*(real_answer.begin())).size() << std::endl;
         if (run_answer.size() != real_answer.size()) return false;
         unsigned int K  = run_answer.size();
         unsigned int dims  = (*run_answer.begin()).size();
-        std::cout << "what the fuck is the set size " << dims << std::endl;
+        //std::cout << "what the fuck is the set size " << dims << std::endl;
         auto it_run = run_answer.begin(), it_real = real_answer.begin();
         bool are_equal = true;
         for (size_t i = 0; i < K; i++) {
             std::vector<float> run_i = *it_run, real_i = *it_real;
             if (run_i.size() != dims || real_i.size() != dims) return false;
-            std::cout << "should make it to heare" << std::endl;
+            //std::cout << "should make it to heare" << std::endl;
             for (size_t d = 0; d < dims; d++) {
                 are_equal = (are_equal && (run_i[d] == Approx(real_i[d])));
-                std::cout << "ans: " << run_i[d] << " correct: " << real_i[d] << " what it evaluates to: " << (run_i[d] == (Approx(real_i[d]))) <<  " are equal: " << are_equal << std::endl;
+                //std::cout << "ans: " << run_i[d] << " correct: " << real_i[d] << " what it evaluates to: " << (run_i[d] == (Approx(real_i[d]))) <<  " are equal: " << are_equal << std::endl;
             }
             it_run++;
             it_real++;
         }
-        std::cout << "we are returning -> " <<are_equal << std::endl;
+        //std::cout << "we are returning -> " <<are_equal << std::endl;
         return are_equal;
 
     }
 
     void kmeans_correctness_test(struct TestData td)
     {
-        std::cout << "Start of test" << std::endl;
+        //std::cout << "Start of test" << std::endl;
         KMeans kmeans(td.K, td.DT);
         kmeans.fit(td.input);
         std::set<std::vector<float>> run_ans;
         for (unsigned int i = 0; i < td.K; i++) {
             run_ans.insert(kmeans.getCentroid(i));
-            std::cout << "inserted another item" << std::endl;
+            //std::cout << "inserted another item" << std::endl;
             for(float val: kmeans.getCentroid(i)){
-                std::cout << val << " ";
+                //std::cout << val << " ";
             } 
-            std::cout << std::endl;
+            //std::cout << std::endl;
         }
         bool are_equal = are_approx_equal(run_ans, td.answer);
-        std::cout << "end of test: " << are_equal << std::endl;
+        //std::cout << "end of test: " << are_equal << std::endl;
         REQUIRE(are_equal == true);
 
     }
-     
+
     TEST_CASE("basic kmeans clustering 1") {
 
         struct TestData td;
@@ -254,33 +254,6 @@ namespace kmeans {
         REQUIRE(run_answer ==  answer);
     }
 
-/*
-    TEST_CASE("Mahalanobis distance test") {
-        std::vector<std::vector<float>> input = {
-            {0, 0},
-            {1, 1},
-            {2, 2},
-            {3, 2},
-            {3, 3}};
-        std::vector<std::vector<float>> q = {{4, 4}, {4, 2}};
-        KMeans km_maha(1, KMeans::mahalanobis);
-        km_maha.padData(q);
-        km_maha.padData(input);
-        km_maha.createCovarianceMatrix(input);
-        std::vector<float> cov = km_maha.getCovarianceMatrix();
-        for (float &f : cov){
-            std::cout << f << ", ";
-        }
-        std::cout << std::endl;
-
-
-        double  d1 = km_maha.distance(input[4], q[0]),
-                d2 = km_maha.distance(input[4], q[1]);
-        std::cerr << "distances " << d1 << " vs " << d2 << std::endl;
-        REQUIRE(d1 < d2);
-    }
-*/
-
     TEST_CASE("distanceType test"){
         unsigned int K = 3;
         std::vector<std::vector<float>> input = {
@@ -325,10 +298,85 @@ namespace kmeans {
                 euc2 = km_maha.totalError(input, KMeans::euclidean),
                 maha1 = km_maha.totalError(input, KMeans::mahalanobis),
                 maha2 = km_euc.totalError(input, KMeans::mahalanobis);
-        std::cout << "euclidean: " << euc1 << " vs " << euc2 << std::endl;
-        std::cout << "mahalanobis: " << maha1 << " vs " << maha2 << std::endl;
+        //std::cout << "euclidean: " << euc1 << " vs " << euc2 << std::endl;
+        //std::cout << "mahalanobis: " << maha1 << " vs " << maha2 << std::endl;
         REQUIRE(maha1 <= maha2);
         REQUIRE(euc1 <= euc2);
     }
-    
+#if __AVX__
+    TEST_CASE("Mahadist test")
+    {
+        std::vector<std::vector<float>> input = {
+                {-2, 3 ,4},
+                {-2, 3 ,4},
+                {0, 0 ,0}};
+
+
+        KMeans km_maha(1, KMeans::mahalanobis, 10, 300);
+        km_maha.padData(input);
+        km_maha.covarianceMatrix = std::vector<float>(8*8, 1);
+        double d1 = km_maha.mahaDistance(input[0], input[1]);
+        double d2 = km_maha.mahaDistance_avx(input[0], input[1]);
+
+        double d3 = km_maha.mahaDistance(input[0], input[2]);
+        double d4 = km_maha.mahaDistance_avx(input[0], input[2]);
+        //std::cout << d1 << ", " << d2 << "\t" << d3 << ", " << d4 << std::endl;
+        REQUIRE(d1 == d2);
+        REQUIRE(d3 == d4);
+
+
+
+
+    }
+    TEST_CASE("MahaDist avx vs no avx")
+    {
+        std::vector<std::vector<float>> input = {
+            {-1.82445727,  0.04013046},
+            { 0.28121734, -0.25688856},
+            {-1.82976968,  0.02095528},
+            { 0.83968045,  0.30968837},
+            { 0.91359481, -0.30797411},
+            {-0.81865681,  0.4669873 },
+            { 0.07045335, -0.48246012},
+            { 1.97495704, -0.00925621},
+            {-0.64461239, -0.1055485 },
+            { 1.67525065,  0.01462244},
+            { 1.17554273,  1.04013046},
+            { 3.28121734,  0.74311144},
+            { 1.17023032,  1.02095528},
+            { 3.83968045,  1.30968837},
+            { 3.91359481,  0.69202589},
+            { 2.18134319,  1.4669873 },
+            { 3.07045335,  0.51753988},
+            { 4.97495704,  0.99074379},
+            { 2.35538761,  0.8944515 },
+            { 4.67525065,  1.01462244},
+            { 4.17554273,  0.04013046},
+            { 6.28121734, -0.25688856},
+            { 4.17023032,  0.02095528},
+            { 6.83968045,  0.30968837},
+            { 6.91359481, -0.30797411},
+            { 5.18134319,  0.4669873 },
+            { 6.07045335, -0.48246012},
+            { 7.97495704, -0.00925621},
+            { 5.35538761, -0.1055485 },
+            { 7.67525065,  0.01462244}};
+
+        KMeans km_maha(1, KMeans::mahalanobis, 10, 300);
+        km_maha.padData(input);
+        km_maha.createCovarianceMatrix(input);
+        double total = 0;
+        double total_avx = 0;
+        auto cov = km_maha.getCovarianceMatrix();
+
+        for (unsigned int i = 0; i < input.size(); i++) {
+            for (unsigned int j = 0; j < input.size(); j++) {
+                total_avx += km_maha.mahaDistance_avx(input[i], input[j]);
+                total += km_maha.mahaDistance(input[i], input[j]);
+            }
+        }
+        REQUIRE(Approx(total).margin(0.0001) == total_avx);
+
+    }
+#endif
 }

@@ -45,6 +45,7 @@ Format for PQ:
   - [x] Get SIMD  to work for subspaces
   - [ ] Use SIMD in mahalanobis distance
 - [ ] Run experiments and gather data
+- [ ] Make cost benefit of using SIMD for asymmetric (fraction of padding)
 
 
 
@@ -98,3 +99,33 @@ nanoPQ
 Look more into alignment  
 Just find best parameters and optimize for those  
 General -> optimize 
+
+### My laptop
+
+#### Comparing -O3 to -O2
+
+|               ns/op |                op/s |    err% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------:|:----------
+|              114.17 |        8,759,074.33 |    0.2% |      0.00 | `Maha distance WITH AVX -O3`
+|              946.36 |        1,056,675.92 |    0.9% |      0.01 | `Maha distance NO AVX -O3`
+|              644.36 |        1,551,915.47 |    0.0% |      0.00 | `Maha distance WITH AVX -O2`
+|            7,892.78 |          126,698.02 |    0.5% |      0.05 | `Maha distance NO AVX -O2`
+
+
+#### Comparing Maha to Euc (-O3)
+|               ns/op |                op/s |    err% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------:|:----------
+|              120.20 |        8,319,147.15 |    0.5% |      0.01 | `Maha distance WITH AVX`
+|              902.29 |        1,108,294.78 |    2.8% |      0.05 | `Maha distance NO AVX`
+|                4.94 |      202,234,373.16 |    0.1% |      0.00 | `Euc distance WITH AVX`
+|               21.43 |       46,653,659.42 |    0.1% |      0.00 | `Euc distance NO AVX`
+
+
+### HPC
+
+|               ns/op |                op/s |    err% |          ins/op |          cyc/op |    IPC |         bra/op |   miss% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------------:|----------------:|-------:|---------------:|--------:|----------:|:----------
+|              813.41 |        1,229,392.79 |    0.2% |        4,967.02 |        2,919.44 |  1.701 |         394.00 |    0.3% |      0.00 | `Maha distance WITH AVX`
+|           11,774.51 |           84,929.20 |    0.0% |      107,589.03 |       42,232.22 |  2.548 |      13,581.01 |    0.3% |      0.07 | `Maha distance NO AVX`
+
+

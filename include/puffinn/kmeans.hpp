@@ -33,6 +33,7 @@ namespace puffinn
             }
         };
         enum distanceType {euclidean, mahalanobis, none};
+        std::vector<float> covarianceMatrix;
     private:
 
         using dataType = std::vector<std::vector<float>>;
@@ -42,7 +43,6 @@ namespace puffinn
         const float TOL;
         const uint16_t MAX_ITER;
         const unsigned int N_RUNS;
-        std::vector<float> covarianceMatrix;
         distanceType MODE;
 
         // gb_centroids is for the global best set of centroids
@@ -70,7 +70,7 @@ namespace puffinn
             // add padding to make each vector a multiple of 8
             assert(K <= data.size());
             padData(data);
-            std::cerr << "Fit called with data size: " << data.size() << ", " << data[0].size() << std::endl;
+            //std::cerr << "Fit called with data size: " << data.size() << ", " << data[0].size() << std::endl;
             //std::cerr << "Data size: " << data.size() << ", " << data[0].size() << std::endl;
 
             if (MODE == mahalanobis){
@@ -81,7 +81,7 @@ namespace puffinn
             gb_inertia = FLT_MAX;
             // init_centers_random(); doesn't work
             for(unsigned int run=0; run < N_RUNS; run++) {
-                std::cerr << "Run " << run+1 << "/" << N_RUNS << std::endl;
+                //std::cerr << "Run " << run+1 << "/" << N_RUNS << std::endl;
                 std::vector<Cluster> clusters = init_centroids_kpp(data);
                 //std::cerr << "Initilaized clusters" << std::endl;
                 float run_inertia = lloyd(data, clusters);
@@ -101,6 +101,10 @@ namespace puffinn
             return std::vector<float>(&*gb_clusters[c_i].centroid.begin(), &*gb_clusters[c_i].centroid.end()-padding);
         }
 
+        std::vector<unsigned int> getGBMembers(size_t c_i){
+            return gb_clusters[c_i].members;
+        } 
+
         dataType getAllCentroids(){
             dataType all_centroids(K);
             for (unsigned int c_i = 0; c_i < K; c_i++){
@@ -117,11 +121,19 @@ namespace puffinn
         double distance(std::vector<float> &v1, std::vector<float> &v2){
 
             if(MODE == euclidean){
+            #if __AVX__
+                return sumOfSquares_avx(v1, v2);
+            #else
                 return sumOfSquares(v1, v2);
+            #endif
             }
             
             if(MODE == mahalanobis){
+            #if __AVX__
+                return mahaDistance_avx(v1,v2);
+            #else
                 return mahaDistance(v1,v2);
+            #endif
             }
         }
 
@@ -149,7 +161,50 @@ namespace puffinn
 
 
         }
+    #if __AVX__
+        double mahaDistance_avx(std::vector<float> &v1, std::vector<float> &v2)
+        {
+            // Matrix mul is the same when m.T = m, to go row by row in matrix as well right?
+            // instead of by column
+            unsigned int dim = v1.size();
+            unsigned int n256 = dim/8;
+            float *a = &v1[0];
+            float *b = &v2[0];
+            __m256 diff[n256];
+            for (unsigned int n= 0; n < n256; n++) {
+                diff[n] = _mm256_sub_ps(_mm256_loadu_ps(a), _mm256_loadu_ps(b));
+                a += 8;
+                b += 8;
+            }
+            float *c = &covarianceMatrix[0];
+            __m256 sum;
+            __attribute__((aligned(32))) float res_v[dim];
+            __attribute__((aligned(32))) float f[8];
 
+            for (unsigned int d = 0; d < dim; d++) {
+                sum = _mm256_setzero_ps();
+                for (unsigned int n= 0; n < n256; n++) {
+                    sum = _mm256_add_ps(sum, _mm256_mul_ps(diff[n], _mm256_loadu_ps(c)));
+                    c+=8;
+                }
+                _mm256_store_ps(f, sum);
+                res_v[d] = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7];
+            }
+            sum = _mm256_setzero_ps();
+            float *d = res_v;
+            for (unsigned int n= 0; n < n256; n++) {
+                sum = _mm256_add_ps(sum, _mm256_mul_ps(diff[n], _mm256_loadu_ps(d)));
+                d += 8;
+            }
+            _mm256_store_ps(f, sum);
+            double s = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7];
+            return s;
+        }
+
+
+
+
+    #endif
         double totalError(dataType &data, distanceType mode = none) {
             padData(data);
             if (mode == none) {
@@ -165,15 +220,16 @@ namespace puffinn
                     else if (mode == mahalanobis) total_err += mahaDistance(data[idx], c.centroid);
                     //total_err += (*d_ptr)(data[idx], c.centroid);
                 }
-                std::cerr << std::endl;
+                //std::cerr << std::endl;
             }
-            std::cerr << std::endl << std::endl;
+            //std::cerr << std::endl << std::endl;
             return total_err;
             
 
         }
 
         void createCovarianceMatrix(dataType &data){
+            //std::cerr << "Data dims " << data.size() << ", " << data[0].size() << std::endl;
             covarianceMatrix.resize(data[0].size()*data[0].size());
             // Use SIMD
 
@@ -216,6 +272,7 @@ namespace puffinn
                 inertia = current_inertia;
                 iteration++;
             }
+            //std::cerr << std::endl;
             return inertia;
 
         }
@@ -240,15 +297,15 @@ namespace puffinn
         std::vector<Cluster> init_centroids_random(dataType &data)
         {
             std::vector<Cluster> clusters(K);
-            std::cerr << "Init random centers" << std::endl;
+            //std::cerr << "Init random centers" << std::endl;
             auto &rand_gen = get_default_random_generator();
             std::uniform_int_distribution<unsigned int> random_idx(0, data.size()-1);
 
             unsigned int c_i = 0;
             std::unordered_set<unsigned int> used;
-            std::cerr << "BLYat" << std::endl;
+            //std::cerr << "BLYat" << std::endl;
             while(c_i < K) {
-                std::cerr << "k" << std::endl;
+                //std::cerr << "k" << std::endl;
                 unsigned int sample_idx = random_idx(rand_gen);
                 if (used.find(sample_idx) == used.end()) {
                     used.insert(sample_idx);
@@ -261,7 +318,7 @@ namespace puffinn
 
     // sumOfSquares heavily inspired from https://github.com/yahoojapan/NGT/blob/master/lib/NGT/Clustering.h
     #ifdef __AVX2__
-        double sumOfSquares(std::vector<float> &v1, std::vector<float> &v2)
+        double sumOfSquares_avx(std::vector<float> &v1, std::vector<float> &v2)
         {
             __m256 sum = _mm256_setzero_ps();
             float *a = &v1[0];
@@ -279,7 +336,7 @@ namespace puffinn
             double s = f[0] + f[1] + f[2] + f[3] + f[4] + f[5] + f[6] + f[7];
             return s;
         }
-    #else
+    #endif
         double sumOfSquares(std::vector<float> &v1, std::vector<float> &v2)
         {
 
@@ -293,7 +350,6 @@ namespace puffinn
             }
             return csum;
         }
-    #endif
 
         // Kmeans++ initialization of centroids
         std::vector<Cluster> init_centroids_kpp(dataType &data)

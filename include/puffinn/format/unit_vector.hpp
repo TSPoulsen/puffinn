@@ -95,6 +95,13 @@ namespace puffinn {
                 dot_product_i16_simple(lhs, rhs, dimensions));
             return dot; // Ensure the similarity is between 0 and 1.
         }
+
+        static float innerProduct_avx(int16_t* lhs, int16_t* rhs, unsigned int dimensions) {
+            float dot = from_16bit_fixed_point(
+                dot_product_i16(lhs, rhs, dimensions));
+            return dot; // Ensure the similarity is between 0 and 1.
+        }
+         
         
 
         static float distance(Type* p1, Type* p2, unsigned int dimensions) {

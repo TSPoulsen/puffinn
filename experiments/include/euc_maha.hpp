@@ -15,12 +15,12 @@ using namespace puffinn;
 // as well as estimated inner products using PQ for varying values of m [1,2,4,8]
 void euclidian_mahalanobis_comparison()
 {
-    std::cerr << "Euclidean distance vs Mahalanobis distance experiment" << std::endl << std::endl;
+    //std::cerr << "Euclidean distance vs Mahalanobis distance experiment" << std::endl << std::endl;
     // setup
     Dataset<UnitVectorFormat> train(0,0);
     Dataset<UnitVectorFormat> test(0,0);
-    std::pair<int,int> train_dim = utils::load<UnitVectorFormat>(train, "train", DATA_PATH, 100000);
-    std::pair<int,int> test_dim = utils::load<UnitVectorFormat>(test, "test", DATA_PATH, 100);
+    std::pair<int,int> train_dim = utils::load<UnitVectorFormat>(train, "train", DATA_PATH, 1000);
+    std::pair<int,int> test_dim = utils::load<UnitVectorFormat>(test, "test", DATA_PATH, 10);
     H5::H5File *file = new H5::H5File("experiments/results/euc_maha_comp.hdf5", H5F_ACC_TRUNC);
 
     hsize_t dims[2] = {test_dim.first, train_dim.first};
@@ -41,11 +41,11 @@ void euclidian_mahalanobis_comparison()
 
     // Calculating & writing results
     for (int m = 1; m < 9; m*=2) {
-        std::cerr << "RUN M=" << m << std::endl;
+        //std::cerr << "RUN M=" << m << std::endl;
         std::ostringstream ss; ss << m << "m";
         H5::Group *grp = new H5::Group(file->createGroup(ss.str()));
         puffinn::PQFilter filter_euc(train, m, 256, puffinn::KMeans::euclidean);
-        puffinn::PQFilter filter_maha(train, m, 256, puffinn::KMeans::mahalanobis);
+        //puffinn::PQFilter filter_maha(train, m, 256, puffinn::KMeans::mahalanobis);
 
         // calculate asymmetric distance for euclidean PQFilter
         for (int j = 0; j < test_dim.first; j++) {
@@ -56,6 +56,7 @@ void euclidian_mahalanobis_comparison()
         H5::DataSet *asym_data = new H5::DataSet(grp->createDataSet("Asymmetric_distance_euclidean", H5::PredType::NATIVE_FLOAT, space));
         asym_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
 
+        /*
         // calculate asymmetric distance for mahalanobis PQFilter
         for (int j = 0; j < test_dim.first; j++) {
             for (int i = 0; i < train_dim.first; i++) {
@@ -64,7 +65,9 @@ void euclidian_mahalanobis_comparison()
         }
         H5::DataSet *sym_data = new H5::DataSet(grp->createDataSet("Symmetric_distance_mahalanobis", H5::PredType::NATIVE_FLOAT, space));
         sym_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
-        std::cerr << std::endl << std::endl;
+        //std::cerr << std::endl << std::endl;
+        //
+        */
     }
 
     delete[] result_arr;
