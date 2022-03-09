@@ -24,12 +24,11 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
-        pq1.createCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
         REQUIRE(0.0 == pq1.totalQuantizationError());
     }
-
+    
     TEST_CASE("PQFilter generate correct PQcodes 2") {
         unsigned int N = 4, dims = 4, m = 2, k = 2;
         std::vector<float>  data[N] = {
@@ -43,7 +42,7 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
-        pq1.createCodebook();
+        //pq1.showCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
         REQUIRE(0.0 == pq1.totalQuantizationError());
@@ -65,10 +64,10 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
-        pq1.createCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
         REQUIRE(0.0 != pq1.totalQuantizationError());
     }
+    
 
 }

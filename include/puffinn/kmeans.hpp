@@ -59,7 +59,8 @@ namespace puffinn
             MODE(mode)
         {
             assert(K <= 256);
-            std::cerr << "Kmeans info: tK=" << (unsigned int)K << std::endl;
+            assert(K > 0);
+            //std::cerr << "Kmeans info: K=" << K << std::endl;
         }
 
         ~KMeans() {}
@@ -67,7 +68,10 @@ namespace puffinn
         void fit(dataType &data)
         {
             // add padding to make each vector a multiple of 8
+            assert(K <= data.size());
             padData(data);
+            std::cerr << "Fit called with data size: " << data.size() << ", " << data[0].size() << std::endl;
+            //std::cerr << "Data size: " << data.size() << ", " << data[0].size() << std::endl;
 
             if (MODE == mahalanobis){
                 createCovarianceMatrix(data);
@@ -79,10 +83,11 @@ namespace puffinn
             for(unsigned int run=0; run < N_RUNS; run++) {
                 std::cerr << "Run " << run+1 << "/" << N_RUNS << std::endl;
                 std::vector<Cluster> clusters = init_centroids_kpp(data);
+                //std::cerr << "Initilaized clusters" << std::endl;
                 float run_inertia = lloyd(data, clusters);
                 if (run_inertia < gb_inertia) {
                     //New run is the currently best, thus overwrite gb variables
-                    std::cout << "assigning new gb_clusters" << std::endl;
+                    //std::cout << "assigning new gb_clusters" << std::endl;
                     gb_inertia = run_inertia;
                     gb_clusters =  clusters; // Copies the whole Class 
                 }
@@ -318,6 +323,7 @@ namespace puffinn
         // Sets the labels for all vectors, and returns inertia
         double assignToClusters(dataType &data, std::vector<Cluster> &clusters)
         {
+            //std::cerr << "assignToCluster" << std::endl;
             // Clear member variable for each cluster
             for (auto cit = clusters.begin(); cit != clusters.end(); cit++) {
                 (*cit).members.clear();

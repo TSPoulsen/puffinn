@@ -7,17 +7,19 @@
 namespace puffinn{
     class PQFilter{
         unsigned int M, dims;
-        unsigned char K;
+        unsigned int K;
+        KMeans::distanceType MODE;
         //codebook that contains m*k centroids
         std::vector<Dataset<UnitVectorFormat>> codebook;
         std::vector<std::vector<std::vector<float>>> centroidDistances;
         Dataset<UnitVectorFormat> &dataset;
         std::vector<unsigned int> subspaceSizes, offsets = {0};
         public:
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 16, unsigned int k = 256)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 16, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
         :M(m),
         dims(dataset.get_description().args),
         K(k),
+        MODE(mode),
         dataset(dataset)
         {
             subspaceSizes.resize(M);
@@ -28,10 +30,11 @@ namespace puffinn{
             createCodebook();
             createDistanceTable();
         }
-        PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
         :M(subs.size()),
         dims(dims),
         K(k),
+        MODE(mode),
         dataset(dataset)
         {   
             setSubspaceSizes(subs);
@@ -84,17 +87,17 @@ namespace puffinn{
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
-                KMeans kmeans(K); 
+                KMeans kmeans(K, MODE); 
                 std::vector<std::vector<float>> subspace = getSubspace(m);
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
                 // Convert back to UnitVectorFormat and store in codebook
                 codebook.push_back(Dataset<UnitVectorFormat>(subspaceSizes[m], dataset.get_size()));
-                for (unsigned int i = 0; i < dataset.get_size(); i++) {
+                for (unsigned int i = 0; i < K; i++) {
                     UnitVectorFormat::Type *c_p = codebook[m][i];
                     float *vec_p = &centroids[i][0];
                     for (unsigned int d = 0; d < subspaceSizes[m]; d++) {
-                        *c_p++ = UnitVectorFormat::from_16bit_fixed_point(*vec_p++);
+                        *c_p++ = UnitVectorFormat::to_16bit_fixed_point(*vec_p++);
                     }
                 }
                 
@@ -184,7 +187,7 @@ namespace puffinn{
                 for(int k = 0; k < K; k++){
                     std::cout << "cluster: "<< k << std::endl;
                     for(unsigned int l = 0; l < subspaceSizes[m]; l++){
-                        std::cout << "\t" << codebook[m][k][l] << " ";
+                        std::cout << "\t" <<  UnitVectorFormat::from_16bit_fixed_point(*(codebook[m][k] + l)) << " ";
                     }
                     std::cout << std::endl;
                 }
@@ -201,6 +204,8 @@ namespace puffinn{
             std::cout << std::endl;
             }
         }
+
+        
 
         void showSubSizes(){
             for(auto a: subspaceSizes){
