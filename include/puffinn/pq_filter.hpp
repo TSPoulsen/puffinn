@@ -8,16 +8,18 @@ namespace puffinn{
     class PQFilter{
         unsigned int M, dims;
         unsigned char K;
+        KMeans::distanceType MODE;
         //codebook that contains m*k centroids
         std::vector<Dataset<UnitVectorFormat>> codebook;
         std::vector<std::vector<std::vector<float>>> centroidDistances;
         Dataset<UnitVectorFormat> &dataset;
         std::vector<unsigned int> subspaceSizes, offsets = {0};
         public:
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 16, unsigned int k = 256)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, KMeans::distanceType mode = KMeans::euclidean, unsigned int m = 16, unsigned int k = 256)
         :M(m),
         dims(dataset.get_description().args),
         K(k),
+        MODE(mode),
         dataset(dataset)
         {
             subspaceSizes.resize(M);
@@ -28,10 +30,11 @@ namespace puffinn{
             createCodebook();
             createDistanceTable();
         }
-        PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, KMeans::distanceType mode = KMeans::euclidean, std::vector<unsigned int> subs, unsigned int k = 256)
         :M(subs.size()),
         dims(dims),
         K(k),
+        MODE(mode),
         dataset(dataset)
         {   
             setSubspaceSizes(subs);
@@ -84,7 +87,7 @@ namespace puffinn{
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
-                KMeans kmeans(K); 
+                KMeans kmeans(K, MODE); 
                 std::vector<std::vector<float>> subspace = getSubspace(m);
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
