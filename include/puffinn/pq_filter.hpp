@@ -47,6 +47,7 @@ namespace puffinn{
          
         void rebuild()
         {
+            pqCodes.resize(dataset.get_size());
             createCodebook();
             createDistanceTable();
         }
@@ -235,7 +236,7 @@ namespace puffinn{
             return sum;
         }
 
-        unsigned int getPadSize(){
+        unsigned int getPadSize() const {
             unsigned int ans = 0;
             for(unsigned int m = 0; m < M; m++){
                 ans += codebook[m].get_description().storage_len;
@@ -245,7 +246,7 @@ namespace puffinn{
         }        
 
         //builds a vector padded to align with each subspace at memory pointed to by a
-        void createPaddedQueryPoint(typename UnitVectorFormat::Type* y, int16_t *a){
+        void createPaddedQueryPoint(typename UnitVectorFormat::Type* y, int16_t *a) const {
             unsigned int tmp[16] = {0};
             for(unsigned int m = 0; m < M; m++){
                 for(unsigned int i = 0; i < subspaceSizes[m]; i++){
@@ -266,7 +267,7 @@ namespace puffinn{
             return sum;
         }
         #if __AVX__
-        float asymmetricDistanceComputation_fast_avx(unsigned int xi, typename UnitVectorFormat::Type* y){
+        float asymmetricDistanceComputation_fast_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const{
             float sum = 0;
             std::vector<uint8_t> px = pqCodes[xi];
             for(unsigned int m = 0; m <M; m++){
@@ -277,7 +278,7 @@ namespace puffinn{
         }
         #endif
 
-        float asymmetricDistanceComputation_fast(unsigned int xi, typename UnitVectorFormat::Type* y){
+        float asymmetricDistanceComputation_fast(unsigned int xi, typename UnitVectorFormat::Type* y)const {
             float sum = 0;
             std::vector<uint8_t> px = pqCodes[xi];
             for(unsigned int m = 0; m <M; m++){

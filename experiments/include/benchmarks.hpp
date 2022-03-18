@@ -1,5 +1,8 @@
 #include <nanobench.h>
 #include <puffinn/kmeans.hpp>
+#include <puffinn/pq_filter.hpp>
+#include <puffinn/collection.hpp>
+#include <puffinn.hpp>
 #include "utils.hpp"
 #include <string>
 
@@ -96,11 +99,18 @@ void imp(ankerl::nanobench::Bench *bencher){
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
     auto dims = utils::load(data, "train", data_path, 20000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 4*1024*1024);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 200*1024*1024);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();
-    std::vector<float> query = data[1];
-    std::vector<uint32_t> result = index.search(query, 10, 0.8); 
+    std::vector<float> query = {-0.633   , -0.33511 ,  0.52545 ,  0.092909, -0.97386 , -1.3496  ,
+       -1.9191  , -0.76974 ,  0.34711 , -1.1012  , -0.31359 ,  0.66227 ,
+        0.11019 , -0.70333 ,  1.0159  , -0.1288  ,  0.37742 ,  0.35706 ,
+       -0.1153  ,  0.19528 ,  0.36092 ,  0.92362 , -0.92318 ,  0.42094 ,
+        0.4587};
+    std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::PQ_Simple);
+    for(auto &ele : std::set<uint32_t>(result.begin(), result.end())){
+        std::cout << ele << std::endl;
+    }
 
 }
 
@@ -108,10 +118,12 @@ void all_bench()
 {
     ankerl::nanobench::Bench bencher;
     bencher.minEpochIterations(5000);
-    mahaBench(&bencher);
-    eucBench(&bencher);
-    bencher.minEpochIterations(10);
-    bencher.minEpochIterations(10);
-    pqfBench(&bencher);
-    kmeansBench(&bencher);
+    imp(&bencher);
+    //mahaBench(&bencher);
+    //eucBench(&bencher);
+
+    //bencher.minEpochIterations(10);
+    //bencher.minEpochIterations(10);
+    //pqfBench(&bencher);
+    //kmeansBench(&bencher);
 }

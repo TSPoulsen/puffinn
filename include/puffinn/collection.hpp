@@ -588,7 +588,7 @@ namespace puffinn {
             float recall,
             QuerySketches sketches,
             HashSourceState* hash_state
-        ) /* const  */{
+        ) const {
             SearchBuffers buffers(lsh_maps, sketches, hash_state);
             alignas(32) int16_t bufferedY[pq.getPadSize()];
             pq.createPaddedQueryPoint(query, bufferedY);
@@ -598,7 +598,7 @@ namespace puffinn {
                     auto range = buffers.ranges[range_idx];
                     while (range.first != range.second) {
                         auto idx = *range.first;
-                        if (pq.asymmetricDistanceComputation_fast(idx, bufferedY) < 0.2f) {
+                        if (pq.asymmetricDistanceComputation_fast(idx, bufferedY) < 1.0f) {
                             auto dist = TSim::compute_similarity(
                                 query,
                                 dataset[idx],
