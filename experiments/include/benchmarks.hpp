@@ -76,21 +76,21 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
     pq1.createPaddedQueryPoint(ds[110], tmp);
 
     bencher->run("Asymmetric computing PQ code every call", [&] {
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation(ds[0], ds[110]));
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_simple(ds[0], ds[110]));
     });    
     
     bencher->run("Asymmetric PQ code precomputed", [&] {
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_fast(0, ds[110]));
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation(0, ds[110]));
     });    
     
-    bencher->run("Asymmetric fast creating padded querry once", [&] {
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_fast_avx(0, tmp));
+    bencher->run("Asymmetric fast creating padded query once", [&] {
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0, tmp));
     });
 
-    bencher->run("Asymmetric fast creating padded querry before each call", [&] {
+    bencher->run("Asymmetric fast creating padded query before each call", [&] {
         alignas(32) int16_t tmp1[pq1.getPadSize()];
         pq1.createPaddedQueryPoint(ds[110], tmp1);
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_fast_avx(0, tmp1));
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0, tmp1));
     });    
 
 }
@@ -107,17 +107,25 @@ void imp(ankerl::nanobench::Bench *bencher){
         0.11019 , -0.70333 ,  1.0159  , -0.1288  ,  0.37742 ,  0.35706 ,
        -0.1153  ,  0.19528 ,  0.36092 ,  0.92362 , -0.92318 ,  0.42094 ,
         0.4587};
+    /*  
+    bencher->run("search with PQ_Simple", [&] {
+        std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::PQ_Simple);
+    });
+    bencher->run("search with Simple", [&] {
+        std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::Simple);
+    });
+    */    
     std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::PQ_Simple);
     for(auto &ele : std::set<uint32_t>(result.begin(), result.end())){
         std::cout << ele << std::endl;
     }
-
+    
 }
 
 void all_bench()
 {
     ankerl::nanobench::Bench bencher;
-    bencher.minEpochIterations(5000);
+    bencher.minEpochIterations(1);
     imp(&bencher);
     //mahaBench(&bencher);
     //eucBench(&bencher);

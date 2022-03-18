@@ -24,6 +24,7 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
+        pq1.rebuild();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
         REQUIRE(0.0 == pq1.totalQuantizationError());
@@ -42,6 +43,7 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
+        pq1.rebuild();
         //pq1.showCodebook();
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
@@ -63,7 +65,8 @@ namespace pq{
         for (auto entry: data){
             dataset.insert(entry);
         }
-        PQFilter pq1(dataset, m,k);        #endif
+        PQFilter pq1(dataset, m,k);
+        pq1.rebuild(); 
 
         //Since cluster 0 might not have the same values each time
         //we have to use the quantization error to see if we are generating the correct PQcodes
@@ -87,12 +90,14 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
-        REQUIRE(pq1.totalQuantizationError_fast() == pq1.totalQuantizationError());
+        pq1.rebuild();
+        REQUIRE(pq1.totalQuantizationError() == pq1.totalQuantizationError_simple());
         
         alignas(32) int16_t tmp[pq1.getPadSize()];
         pq1.createPaddedQueryPoint(dataset[1], tmp);
-        REQUIRE(pq1.asymmetricDistanceComputation(dataset[0], dataset[1]) == pq1.asymmetricDistanceComputation_fast_avx(0, tmp));
-        REQUIRE(pq1.symmetricDistanceComputation(dataset[2], dataset[3]) == pq1.symmetricDistanceComputation_fast(2, dataset[3]));
+
+        REQUIRE(pq1.asymmetricDistanceComputation_simple(dataset[0], dataset[1]) == pq1.asymmetricDistanceComputation(0, dataset[1]));
+        REQUIRE(pq1.symmetricDistanceComputation_simple(dataset[2], dataset[3]) == pq1.symmetricDistanceComputation(2, dataset[3]));
     }
     
     TEST_CASE("AsymmetricFast Test"){
@@ -136,20 +141,21 @@ namespace pq{
             dataset.insert(entry);
         }
         PQFilter pq1(dataset, m,k);
+        pq1.rebuild();
         bool isSame = true;
         for(unsigned int i = 0; i < N; i++){
             for( unsigned int j = 0; j < N; j++){
                 alignas(32) int16_t tmp[pq1.getPadSize()];
                 pq1.createPaddedQueryPoint(dataset[j], tmp);
-                float hue = pq1.asymmetricDistanceComputation(dataset[i], dataset[j]);
-                float hue1 = pq1.asymmetricDistanceComputation_fast_avx(i, tmp);
-                
+                float hue = pq1.asymmetricDistanceComputation_simple(dataset[i], dataset[j]);
+                float hue1 = pq1.asymmetricDistanceComputation_avx(i, tmp);
                 isSame = (hue == hue1);
             }          
         }
         REQUIRE(isSame);
         
     }
+    
 
 
 }

@@ -598,7 +598,7 @@ namespace puffinn {
                     auto range = buffers.ranges[range_idx];
                     while (range.first != range.second) {
                         auto idx = *range.first;
-                        if (pq.asymmetricDistanceComputation_fast(idx, bufferedY) < 1.0f) {
+                        if (pq.asymmetricDistanceComputation_avx(idx, bufferedY) < 1.0f) {
                             auto dist = TSim::compute_similarity(
                                 query,
                                 dataset[idx],
