@@ -29,9 +29,9 @@ namespace puffinn{
             unsigned int leftover = dims - ((dims/M) * M);
             for(unsigned int i = 0; i < leftover; i++) subspaceSizes[i]++;
             for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ subspaceSizes[i-1]);
-            createCodebook();
-            createDistanceTable();
         }
+
+
         PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
         :M(subs.size()),
         dims(dims),
@@ -44,8 +44,13 @@ namespace puffinn{
             createCodebook();
             createDistanceTable();
         }
-        
-        
+         
+        void rebuild()
+        {
+            createCodebook();
+            createDistanceTable();
+        }
+
         void setSubspaceSizes(std::vector<unsigned int> subs){
             subspaceSizes = subs;
             offsets.clear();

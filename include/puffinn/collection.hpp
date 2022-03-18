@@ -7,6 +7,7 @@
 #include "puffinn/hash_source/independent.hpp"
 #include "puffinn/maxbuffer.hpp"
 #include "puffinn/prefixmap.hpp"
+#include "pq_filter.hpp"
 #include "puffinn/typedefs.hpp"
 //#include "puffinn/kmeans.hpp"
 
@@ -29,7 +30,9 @@ namespace puffinn {
         None,
         /// A simple approach which mirrors ``None``, but with filtering.
         /// It is only intended to be used to fairly assess the impact of sketching on the result. 
-        Simple
+        Simple,
+        // A simple approach wich mirror Simple, but uses Product quantization to filter
+        PQ_Simple
     };
 
     class ChunkSerializable {
@@ -102,6 +105,7 @@ namespace puffinn {
         // Construction of the hash source is delayed until the
         // first rebuild so that we know how many tables are at most used.
         std::unique_ptr<HashSourceArgs<THash>> hash_args;
+        PQFilter pq;
 
     public:
         /// Construct an empty index.
@@ -127,7 +131,8 @@ namespace puffinn {
           : dataset(Dataset<typename TSim::Format>(dataset_args)),
             filterer(sketch_args, dataset.get_description()),
             memory_limit(memory_limit),
-            hash_args(hash_args.copy())
+            hash_args(hash_args.copy()),
+            pq(dataset,2,32)
         {
             static_assert(
                 std::is_same<TSim, typename THash::Sim>::value
@@ -306,6 +311,7 @@ namespace puffinn {
                 lsh_maps[map_idx].rebuild();
             }
             last_rebuild = dataset.get_size();
+            pq.rebuild();
         }
 
         /// Search for the approximate ``k`` nearest neighbors to a query.
@@ -448,6 +454,14 @@ namespace puffinn {
                         sketches,
                         hash_state.get());
                     break;
+                case FilterType::PQ_Simple:
+                    search_maps_pq_simple_filter(
+                        query,
+                        maxbuffer,
+                        recall,
+                        sketches,
+                        hash_state.get());
+                    break;
                 default:
                     search_maps(query, maxbuffer, recall, sketches, hash_state.get());
             }
@@ -547,6 +561,54 @@ namespace puffinn {
                         maxbuffer.insert(idx, dist);
                         range.first++;
                     }
+                }
+                g_performance_metrics.store_time(Computation::Consider);
+                g_performance_metrics.start_timer(Computation::CheckTermination);
+                auto kth_similarity = maxbuffer.smallest_value();
+                auto table_idx = lsh_maps.size();
+                auto last_tables = (depth == MAX_HASHBITS ? table_idx : lsh_maps.size());
+                float failure_prob = hash_source->failure_probability(
+                    depth,
+                    table_idx,
+                    last_tables,
+                    kth_similarity
+                );
+                g_performance_metrics.store_time(Computation::CheckTermination);
+                if (failure_prob <= 1-recall) {
+                    g_performance_metrics.set_hash_length(depth);
+                    g_performance_metrics.set_considered_maps(
+                        (MAX_HASHBITS-depth+1)*lsh_maps.size());
+                    return;
+                }
+            }
+        }
+        void search_maps_pq_simple_filter(
+            typename TSim::Format::Type* query,
+            MaxBuffer& maxbuffer,
+            float recall,
+            QuerySketches sketches,
+            HashSourceState* hash_state
+        ) /* const  */{
+            SearchBuffers buffers(lsh_maps, sketches, hash_state);
+            alignas(32) int16_t bufferedY[pq.getPadSize()];
+            pq.createPaddedQueryPoint(query, bufferedY);
+            for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
+                buffers.fill_ranges(lsh_maps);
+                for (uint_fast32_t range_idx=0; range_idx < buffers.num_ranges; range_idx++) {
+                    auto range = buffers.ranges[range_idx];
+                    while (range.first != range.second) {
+                        auto idx = *range.first;
+                        if (pq.asymmetricDistanceComputation_fast(idx, bufferedY) < 0.2f) {
+                            auto dist = TSim::compute_similarity(
+                                query,
+                                dataset[idx],
+                                dataset.get_description());
+                            maxbuffer.insert(idx, dist);
+                        }
+                        range.first++;
+                    }
+                    auto kth_similarity = maxbuffer.smallest_value();
+                    buffers.sketches.max_sketch_diff = filterer.get_max_sketch_diff(kth_similarity);
                 }
                 g_performance_metrics.store_time(Computation::Consider);
                 g_performance_metrics.start_timer(Computation::CheckTermination);

@@ -91,6 +91,18 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
     });    
 
 }
+void imp(ankerl::nanobench::Bench *bencher){
+
+    std::vector<std::vector<float>> data;
+    std::string data_path = "data/glove-25-angular.hdf5";
+    auto dims = utils::load(data, "train", data_path, 20000);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 4*1024*1024);
+    for (std::vector<float> & v : data) { index.insert(v); }
+    index.rebuild();
+    std::vector<float> query = data[1];
+    std::vector<uint32_t> result = index.search(query, 10, 0.8); 
+
+}
 
 void all_bench()
 {

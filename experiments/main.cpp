@@ -6,6 +6,7 @@
 #include "puffinn/pq_filter.hpp"
 #include "puffinn/format/real_vector.hpp"
 #include "puffinn/format/unit_vector.hpp"
+#include "PQFilter_bench.hpp"
 #include "set"
 #include "benchmarks.hpp"
 using namespace puffinn;
