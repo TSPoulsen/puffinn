@@ -590,15 +590,18 @@ namespace puffinn {
             HashSourceState* hash_state
         ) const {
             SearchBuffers buffers(lsh_maps, sketches, hash_state);
-            alignas(32) int16_t bufferedY[pq.getPadSize()];
-            pq.createPaddedQueryPoint(query, bufferedY);
+
+            alignas(32) int16_t paddedY[pq.getPadSize()];
+            pq.createPaddedQueryPoint(query, paddedY);
+            pq.precomp_query_to_centroids(paddedY);
+            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(0.9f);
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);
                 for (uint_fast32_t range_idx=0; range_idx < buffers.num_ranges; range_idx++) {
                     auto range = buffers.ranges[range_idx];
                     while (range.first != range.second) {
                         auto idx = *range.first;
-                        if (pq.asymmetricDistanceComputation_avx(idx, bufferedY) < 1.0f) {
+                        if (pq.estimatedInnerProduct(idx) > limit) {
                             auto dist = TSim::compute_similarity(
                                 query,
                                 dataset[idx],

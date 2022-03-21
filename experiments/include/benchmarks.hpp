@@ -3,6 +3,7 @@
 #include <puffinn/pq_filter.hpp>
 #include <puffinn/collection.hpp>
 #include <puffinn.hpp>
+#include <math.h>
 #include "utils.hpp"
 #include <string>
 
@@ -71,7 +72,8 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
     for(std::vector<float> v: data){
         ds.insert(v);
     }
-    puffinn::PQFilter pq1(ds, 2, 32);
+    puffinn::PQFilter pq1(ds, 2, 256);
+    pq1.rebuild();
     alignas(32) int16_t tmp[pq1.getPadSize()];
     pq1.createPaddedQueryPoint(ds[110], tmp);
 
@@ -80,26 +82,44 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
     });    
     
     bencher->run("Asymmetric PQ code precomputed", [&] {
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation(0, ds[110]));
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation(0u, ds[110]));
     });    
     
     bencher->run("Asymmetric fast creating padded query once", [&] {
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0, tmp));
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0u, tmp));
     });
 
     bencher->run("Asymmetric fast creating padded query before each call", [&] {
         alignas(32) int16_t tmp1[pq1.getPadSize()];
         pq1.createPaddedQueryPoint(ds[110], tmp1);
-        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0, tmp1));
-    });    
+        ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_avx(0u, tmp1));
+    });
+
+    
+    bencher->run("building query distances", [&] {
+        pq1.precomp_query_to_centroids(tmp);
+    });
+
+    bencher->run("Estimated Inner product O(M)", [&] {
+        for(unsigned int i = 0; i < 10000; i++){
+            ankerl::nanobench::doNotOptimizeAway(pq1.estimatedInnerProduct(0u));
+        }
+    });
+
+
+    bencher->run("True Inner product", [&] {
+        for(unsigned int i = 0; i < 10000; i++){
+            ankerl::nanobench::doNotOptimizeAway(puffinn::dot_product_i16_avx2(ds[0], ds[110], ds.get_description().storage_len));
+        }
+    });
 
 }
 void imp(ankerl::nanobench::Bench *bencher){
 
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
-    auto dims = utils::load(data, "train", data_path, 20000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 200*1024*1024);
+    auto dims = utils::load(data, "train", data_path, 200000);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();
     std::vector<float> query = {-0.633   , -0.33511 ,  0.52545 ,  0.092909, -0.97386 , -1.3496  ,
@@ -107,25 +127,29 @@ void imp(ankerl::nanobench::Bench *bencher){
         0.11019 , -0.70333 ,  1.0159  , -0.1288  ,  0.37742 ,  0.35706 ,
        -0.1153  ,  0.19528 ,  0.36092 ,  0.92362 , -0.92318 ,  0.42094 ,
         0.4587};
-    /*  
-    bencher->run("search with PQ_Simple", [&] {
-        std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::PQ_Simple);
-    });
+      
     bencher->run("search with Simple", [&] {
-        std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::Simple);
+        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::Simple);
     });
-    */    
+    bencher->run("search with None", [&] {
+        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::None);
+    });
+    bencher->run("search with PQ_simple", [&] {
+        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::PQ_Simple);
+    });
+
+    /*   
     std::vector<uint32_t> result = index.search(query, 10, 0.95, puffinn::FilterType::PQ_Simple);
     for(auto &ele : std::set<uint32_t>(result.begin(), result.end())){
         std::cout << ele << std::endl;
     }
-    
+    */   
 }
 
 void all_bench()
 {
     ankerl::nanobench::Bench bencher;
-    bencher.minEpochIterations(1);
+    bencher.minEpochIterations(2000);
     imp(&bencher);
     //mahaBench(&bencher);
     //eucBench(&bencher);

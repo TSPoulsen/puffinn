@@ -1,6 +1,7 @@
 #pragma once
 #include "puffinn/dataset.hpp"
 #include "puffinn/kmeans.hpp"
+#include "math.h"
 #include <vector>
 #include <cfloat>
 #include <iostream>
@@ -13,7 +14,9 @@ namespace puffinn{
         //codebook that contains m*k centroids
         std::vector<Dataset<UnitVectorFormat>> codebook;
         //precomputed inter-centroid distances for faster symmetric distance computation
-        std::vector<std::vector<std::vector<float>>> centroidDistances;
+        std::vector<std::vector<std::vector<int16_t>>> centroidDistances;
+        //pointer to float array of K x M (flattened to 1d array)
+        int16_t *queryDistances;
         std::vector<std::vector<uint8_t>> pqCodes;
         Dataset<UnitVectorFormat> &dataset;
         //meta information about the subspaces to avoid recomputation 
@@ -40,10 +43,15 @@ namespace puffinn{
             for(auto i = subspaceSizes.begin(); i != subspaceSizes.begin()+leftover; i++) (*i)++;
             auto p = subspaceSizes.begin();
             for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ *p++);
+            queryDistances = new int16_t[K*M];
+        }
+
+        ~PQFilter(){
+            delete[] queryDistances;
         }
 
         //Builds the codebook and computes the inter-centroid-distances
-        //Should be called every time the dataset significantly changes a d atleast once before querrying
+        //Should be called every time the dataset significantly changes a d atleast once before querying
         void rebuild()
         {
             pqCodes.resize(dataset.get_size());
@@ -56,11 +64,11 @@ namespace puffinn{
         //Precompute all distance between centroids using AVX2 instructions
         void createDistanceTable(){
             for(unsigned int m = 0; m < M; m++){
-                std::vector<std::vector<float>> subspaceDists;
+                std::vector<std::vector<int16_t>> subspaceDists;
                 for(int k1 = 0; k1 < K; k1++){
-                    std::vector<float> dists;
+                    std::vector<int16_t> dists;
                     for(int k2 = 0; k2 < K; k2++){
-                        dists.push_back(UnitVectorFormat::innerProduct_avx(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
+                        dists.push_back(dot_product_i16_avx2(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
                     }
                     subspaceDists.push_back(dists);
                 }
@@ -73,11 +81,11 @@ namespace puffinn{
         //Precompute all distance between centroids 
         void createDistanceTable(){
             for(unsigned int m = 0; m < M; m++){
-                std::vector<std::vector<float>> subspaceDists;
+                std::vector<std::vector<int16_t>> subspaceDists;
                 for(int k1 = 0; k1 < K; k1++){
-                    std::vector<float> dists;
+                    std::vector<int16_t> dists;
                     for(int k2 = 0; k2 < K; k2++){
-                        dists.push_back(UnitVectorFormat::innerProduct(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
+                        dists.push_back(dot_product_i16_simple(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
                     }
                     subspaceDists.push_back(dists);
                 }
@@ -156,6 +164,15 @@ namespace puffinn{
             return pqCode;
         }
 
+        void precomp_query_to_centroids(typename UnitVectorFormat::Type* y) const {
+            int16_t * p = queryDistances;
+            for(unsigned int m = 0; m < M; m++){
+                for(unsigned int k = 0; k < K; k++){
+                    *p++ = asymmetricDistanceComputation_avx(codebook[m][k], y);                     
+                }
+            }
+
+        }
 
         //Distance from PQCode to actual vector
         float quantizationError_simple(typename UnitVectorFormat::Type* vec) const {
@@ -215,8 +232,8 @@ namespace puffinn{
         }
 
         //symmetric distance estimation with precomputed PQcode for x
-        float symmetricDistanceComputation(unsigned int xi, typename UnitVectorFormat::Type* y) const {
-            float sum = 0;
+        int16_t symmetricDistanceComputation(unsigned int xi, typename UnitVectorFormat::Type* y) const {
+            int16_t sum = 0;
             //quantize x and y
             std::vector<uint8_t> px = pqCodes[xi], py = getPQCode(y);
             //approximate distance by product quantization (precomputed centroid distances required)
@@ -226,7 +243,7 @@ namespace puffinn{
             return sum;
         }
 
-        //used to allocate enough memory to pad querry point
+        //used to allocate enough memory to pad query point
         unsigned int getPadSize() const {
             unsigned int ans = 0;
             for(unsigned int m = 0; m < M; m++){
@@ -249,11 +266,11 @@ namespace puffinn{
         }  
         
         //asymmetric distance estimation, PQCode computed at runtime
-        float asymmetricDistanceComputation_simple(typename UnitVectorFormat::Type* x, typename UnitVectorFormat::Type* y) const {
-            float sum = 0;
+        int16_t asymmetricDistanceComputation_simple(typename UnitVectorFormat::Type* x, typename UnitVectorFormat::Type* y) const {
+            int16_t sum = 0;
             std::vector<uint8_t> px = getPQCode(x);
             for(unsigned int m = 0; m <M; m++){
-                sum += UnitVectorFormat::innerProduct(y + offsets[m], codebook[m][px[m]], subspaceSizes[m]);
+                sum += dot_product_i16_simple(y + offsets[m], codebook[m][px[m]], subspaceSizes[m]);
             }
             return sum;
         }
@@ -262,16 +279,38 @@ namespace puffinn{
         // Fastest version of asymmetric distance computation using avx2
         ///@param xi index of vector in the dataset
         ///@param y pointer to start of UnitVector (padded for each subspace)
-        float asymmetricDistanceComputation_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const {
-            float sum = 0;
+        
+        int16_t asymmetricDistanceComputation_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const {
+            int16_t sum = 0;
             const uint8_t *px_p = &pqCodes[xi][0];
             const unsigned int *size_p = &subspaceSizesStored[0];
             const Dataset<UnitVectorFormat> *cb_p = &codebook[0];
             for(unsigned int m = 0; m <M; m++){
-                sum += UnitVectorFormat::innerProduct_avx(y, (*cb_p++)[*px_p++], *size_p);
+                sum += dot_product_i16_avx2(y, (*cb_p++)[*px_p++], *size_p);
                 y+= *size_p++;
             }
             return sum;
+        }
+        
+        //ovearlead function so you can query with pointer to vector instead of idx in dataset
+        int16_t asymmetricDistanceComputation_avx(typename UnitVectorFormat::Type* x, typename UnitVectorFormat::Type* y) const {
+            int16_t sum = 0;
+            const unsigned int *size_p = &subspaceSizesStored[0];
+            for(unsigned int m = 0; m <M; m++){
+                sum += dot_product_i16_avx2(y, x, *size_p);
+                x+= *size_p;
+                y+= *size_p++;   
+            }
+            return sum;
+        }
+
+        int16_t estimatedInnerProduct(unsigned int xi) const {
+            int16_t sum = 0;
+            const uint8_t* p = &pqCodes[xi][0];
+            for(unsigned int m = 0; m < M; m++){
+                sum += queryDistances[*p++ + (m*M)];
+            }
+            return sum; 
         }
         
         #else
@@ -285,13 +324,13 @@ namespace puffinn{
         //asymmetric distance estimation using precomputed PQcodes
         ///@param xi index of vector in the dataset
         ///@param y pointer to start of UnitVector (not padded for each subspace)
-        float asymmetricDistanceComputation(unsigned int xi, typename UnitVectorFormat::Type* y) const{
-            float sum = 0;
+        int16_t asymmetricDistanceComputation(unsigned int xi, typename UnitVectorFormat::Type* y) const{
+            int16_t sum = 0;
             const uint8_t *px_p = &pqCodes[xi][0];
             const unsigned int *size_p = &subspaceSizes[0];
             const Dataset<UnitVectorFormat> *cb_p = &codebook[0];
             for(unsigned int m = 0; m <M; m++){
-                sum += UnitVectorFormat::innerProduct(y, (*cb_p++)[*px_p++], *size_p);
+                sum += dot_product_i16_simple(y, (*cb_p++)[*px_p++], *size_p);
                 y += *size_p++;
             }
             return sum;
@@ -299,7 +338,7 @@ namespace puffinn{
 
 
         //Functions below are just debugging tools and old code that might be useful down the road
-        
+        /*
         std::vector<float> getCentroid(unsigned int mID, unsigned int kID){
             return std::vector<float>(codebook[mID][kID], codebook[mID][kID]+ subspaceSizes[mID]);
         }
@@ -338,7 +377,7 @@ namespace puffinn{
         }
 
         //constructor is depricated
-        /*
+        
         PQFilter(Dataset<UnitVectorFormat> &dataset, std::vector<unsigned int> subs, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
         :M(subs.size()),
         dims(dims),
