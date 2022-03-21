@@ -39,14 +39,17 @@ Format for PQ:
   - [x] PQ
 - [x] Test quantization error
 - [ ] Begin writing formal problem definition of ANN
-- [x] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets) (**TIM**)
+- [x] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets)
 - [ ] Look at previous bsc. projects of what is included and to what level of expertize.
 - [x] Use Float inside kmeans instead of UnitVectorFormat (can be better optimized and shouldn't be a problem for space usage) 
   - [x] Get SIMD  to work for subspaces
-  - [ ] Use SIMD in mahalanobis distance
-- [ ] Run experiments and gather data
+  - [x] Use SIMD in mahalanobis distance
+- [x] Run experiments and gather data ??
 - [ ] Make cost benefit of using SIMD for asymmetric (fraction of padding)
-
+- [ ] Filter passing Criteria for PQFilter (+10exp)
+- [ ] Implement PQ as filter with Early stop (martin has to explain code)
+- [ ] Codebook formatted for faster precomputation
+- [ ] What is the recall plotted in their graphs? actual vs requested
 
 
 #### Agenda for next meeting
@@ -129,3 +132,26 @@ General -> optimize
 |           11,774.51 |           84,929.20 |    0.0% |      107,589.03 |       42,232.22 |  2.548 |      13,581.01 |    0.3% |      0.07 | `Maha distance NO AVX`
 
 
+
+Distances stored as floats
+
+|               ns/op |                op/s |    err% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------:|:----------
+|           14,284.00 |           70,008.40 |    1.7% |      0.00 | `Asymmetric computing PQ code every call`
+|               22.72 |       44,022,685.16 |    0.2% |      0.00 | `Asymmetric PQ code precomputed`
+|               15.68 |       63,792,633.02 |    0.2% |      0.00 | `Asymmetric fast creating padded query once`
+|               30.14 |       33,180,418.53 |    0.3% |      0.00 | `Asymmetric fast creating padded query before each call`
+|            6,863.35 |          145,701.44 |    0.7% |      0.00 | `building query distances`
+|           17,517.95 |           57,084.30 |    1.9% |      0.00 | `Estimated Inner product O(M)`
+|           68,792.95 |           14,536.37 |    1.6% |      0.02 | `True Inner product`
+
+Distances stored as Fixpoints(int16_t)
+|               ns/op |                op/s |    err% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------:|:----------
+|           15,033.47 |           66,518.26 |    1.1% |      0.36 | `Asymmetric computing PQ code every call`
+|               24.70 |       40,491,774.28 |    0.1% |      0.00 | `Asymmetric PQ code precomputed`
+|               14.57 |       68,625,813.99 |    1.3% |      0.00 | `Asymmetric fast creating padded query once`
+|               29.57 |       33,815,605.24 |    0.4% |      0.00 | `Asymmetric fast creating padded query before each call`
+|            6,774.71 |          147,607.79 |    2.9% |      0.16 | `building query distances`
+|           16,363.27 |           61,112.49 |    1.7% |      0.39 | `Estimated Inner product O(M)`
+|           69,596.97 |           14,368.44 |    0.3% |      1.67 | `True Inner product`
