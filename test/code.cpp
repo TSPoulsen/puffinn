@@ -8,3 +8,5 @@
 #include "hash_source_test.hpp"
 #include "filterer_test.hpp"
 #include "math_test.hpp"
+#include "kmeans_test.hpp"
+#include "pq_filter_test.hpp"

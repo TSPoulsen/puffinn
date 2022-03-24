@@ -88,6 +88,17 @@ namespace puffinn {
             }
         }
 
+        static float distance(Type* p1, Type* p2, unsigned int dimensions) {
+            float dist = 0;
+            for(unsigned int i = 0; i < dimensions; i++) {
+                float a = from_16bit_fixed_point(p1[i]),
+                      b = from_16bit_fixed_point(p2[i]);
+                dist += std::pow(a-b,2);
+            }
+            // the actual distance is unimportant so no need to take the square root 
+            // dist = std::sqrt(dist)
+            return dist;
+        }
         static void free(Type&) {}
 
         static std::vector<float> generate_random(unsigned int dimensions) {
