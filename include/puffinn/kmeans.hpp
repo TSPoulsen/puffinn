@@ -50,9 +50,9 @@ namespace puffinn
         // gb are the global best results
         // These will also be removed if N_RUNS is removed
         std::vector<Cluster> gb_clusters;
-        double gb_inertia = DBL_MAX;
 
     public:
+        double gb_inertia = DBL_MAX;
         /// Constructs an KMeans instance with chosen parameters
         ///
         /// @param K_clusters Number of clusters to fit the data to (default: 256)
