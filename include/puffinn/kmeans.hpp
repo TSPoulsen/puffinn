@@ -89,9 +89,17 @@ namespace puffinn
             }
 
             gb_inertia = DBL_MAX; // Such that previous calls to fit doesn't affect current 
-            for(unsigned int run=0; run < N_RUNS; run++) {
+            unsigned int to_run = N_RUNS, max_iter = MAX_ITER;
+            if (data.size() >= 100000) {
+                // When dataset is large enough there is no need to run multiple times
+                // Instead we increase iterations
+                to_run = 1; 
+                max_iter = std::max(max_iter, 150u);
+            } 
+
+            for(unsigned int run=0; run < to_run; run++) {
                 std::vector<Cluster> clusters = init_centroids_kpp(data);
-                double run_inertia = lloyd(data, clusters);
+                double run_inertia = lloyd(data, clusters, max_iter);
                 if (run_inertia < gb_inertia) {
                     gb_inertia = run_inertia;
                     gb_clusters =  clusters; // Copies the whole Class 
@@ -122,13 +130,13 @@ namespace puffinn
         // ************************************************************************************
 
         // Performs a single kmeans clustering using the lloyd algorithm
-        double lloyd(dataType &data, std::vector<Cluster> &clusters) 
+        double lloyd(dataType &data, std::vector<Cluster> &clusters, unsigned int max_iter) 
         {
             double inertia_delta = DBL_MAX;
             double inertia = DBL_MAX;
             unsigned int iteration = 0;
 
-            while (inertia_delta > TOL && iteration < MAX_ITER )
+            while (inertia_delta > TOL && iteration < max_iter )
             {
                 // Step 1 in llyod: assign points to clusters
                 double current_inertia = assignToClusters(data, clusters);

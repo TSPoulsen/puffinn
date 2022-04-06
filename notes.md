@@ -50,7 +50,7 @@ Format for PQ:
 - [ ] Implement PQ as filter with Early stop (martin has to explain code)
 - [ ] Codebook formatted for faster precomputation
 - [x] Make Index work with all similarity measures
-- [ ] Don't run lloyd multiple times just increase # of iterations
+- [x] Don't run lloyd multiple times just increase # of iterations
 
 
 #### Agenda for next meeting
