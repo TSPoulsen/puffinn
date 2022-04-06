@@ -49,7 +49,8 @@ Format for PQ:
 - [ ] Filter passing Criteria for PQFilter (+10exp)
 - [ ] Implement PQ as filter with Early stop (martin has to explain code)
 - [ ] Codebook formatted for faster precomputation
-- [ ] What is the recall plotted in their graphs? actual vs requested
+- [x] Make Index work with all similarity measures
+- [ ] Don't run lloyd multiple times just increase # of iterations
 
 
 #### Agenda for next meeting
@@ -81,10 +82,13 @@ Format for PQ:
 - Maybe postpone writing until we are away
 - Use SIMD in mahalanobis 
 
+- If to look at more points at first than later lsh rounds, then first figure out if the average similarity becomes smaller in later rounds
+
 #### Issues/Questions
 - HPC is 10x slower than my own laptop?
 - A lot of code is heavily inspired by NGT, how should I declare this?
 - Creating a test for mahalanobis distance is more difficult than we thought. No existing framework does this, and paper has not released source code
+- What is the recall plotted in their graphs? actual vs requested (A: actual)
 
 ### Conclusion from meeting
 - nanoBench for benchmarking see https://github.com/Cecca/puffinn/blob/master/bench/bench.cpp

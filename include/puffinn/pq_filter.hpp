@@ -21,6 +21,7 @@ namespace puffinn{
         Dataset<UnitVectorFormat> &dataset;
         //meta information about the subspaces to avoid recomputation 
         std::vector<unsigned int> subspaceSizes, offsets = {0}, subspaceSizesStored;
+        bool is_build = false;
         public:
         
         ///Builds short codes for vectors using Product Quantization by projecting every subspace down to neigherst kmeans cluster
@@ -54,10 +55,26 @@ namespace puffinn{
         //Should be called every time the dataset significantly changes a d atleast once before querying
         void rebuild()
         {
+            if (dataset.get_size() == 0){
+                is_build = false;
+                std::fill_n(queryDistances, K*M, 0);
+                return;
+            } 
+
             pqCodes.resize(dataset.get_size());
             createCodebook();
             createDistanceTable();
+            is_build = true;
         }
+
+        uint64_t memory_usage()
+        {
+            uint64_t cb_mem = 0u;
+            for (Dataset<UnitVectorFormat> &d : codebook){
+                cb_mem += d.memory_usage();
+            }
+            return cb_mem + (pqCodes.size() * M * sizeof(uint8_t));
+        }    
 
 
     #if __AVX2__        
@@ -112,19 +129,20 @@ namespace puffinn{
 
         //Runs kmeans for all m subspaces and stores the centroids in codebooks
         void createCodebook(){
+            unsigned int k = std::min(K, dataset.get_size());
             //used to keep track of where subspace begins
             for(unsigned int m = 0; m < M ; m++)
             {
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
-                KMeans kmeans(K, MODE); 
+                KMeans kmeans(k, MODE); 
                 std::vector<std::vector<float>> subspace = getSubspace(m);
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
                 
                 //precompute pqCodes for all points in dataset
-                for(unsigned int i = 0; i < K; i++){
+                for(unsigned int i = 0; i < k; i++){
                     for(unsigned int mem: kmeans.getGBMembers(i)){
                         pqCodes[mem].push_back(i);
                     }
@@ -132,7 +150,7 @@ namespace puffinn{
 
                 // Convert back to UnitVectorFormat and store in codebook
                 codebook.push_back(Dataset<UnitVectorFormat>(subspaceSizes[m], dataset.get_size()));
-                for (unsigned int i = 0; i < K; i++) {
+                for (unsigned int i = 0; i < k; i++) {
                     UnitVectorFormat::Type *c_p = codebook[m][i];
                     float *vec_p = &centroids[i][0];
                     for (unsigned int d = 0; d < subspaceSizes[m]; d++) {
@@ -165,6 +183,7 @@ namespace puffinn{
         }
 
         void precomp_query_to_centroids(typename UnitVectorFormat::Type* y) const {
+            if (!is_build) return;
             int16_t * p = queryDistances;
             for(unsigned int m = 0; m < M; m++){
                 for(unsigned int k = 0; k < K; k++){
@@ -314,7 +333,7 @@ namespace puffinn{
         }
         
         #else
-        float asymmetricDistanceComputation_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const {
+        int16_t asymmetricDistanceComputation_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const {
             std::cerr << "assymetric avx failed -> no AVX2 found" << std::endl;
             return asymmetricDistanceComputation(xi, y);
         }
