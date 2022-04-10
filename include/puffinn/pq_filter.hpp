@@ -15,14 +15,14 @@ namespace puffinn{
         std::vector<Dataset<UnitVectorFormat>> codebook;
         //precomputed inter-centroid distances for faster symmetric distance computation
         std::vector<std::vector<std::vector<int16_t>>> centroidDistances;
-        //pointer to float array of K x M (flattened to 1d array)
+        //pointer to float array of M x K (flattened to 1d array)
         int16_t *queryDistances;
         std::vector<std::vector<uint8_t>> pqCodes;
         Dataset<UnitVectorFormat> &dataset;
         //meta information about the subspaces to avoid recomputation 
         std::vector<unsigned int> subspaceSizes, offsets = {0}, subspaceSizesStored;
         bool is_build = false;
-        public:
+    public:
         
         ///Builds short codes for vectors using Product Quantization by projecting every subspace down to neigherst kmeans cluster
         ///Uses these shortcodes for fast estimation of inner product between vectors  
@@ -184,14 +184,28 @@ namespace puffinn{
 
         void precomp_query_to_centroids(typename UnitVectorFormat::Type* y) const {
             if (!is_build) return;
+            alignas(32) int16_t paddedY[getPadSize()];
+            createPaddedQueryPoint(y, paddedY);
+            int16_t *a_p = &paddedY[0];
             int16_t * p = queryDistances;
+            const unsigned int *size_p = &subspaceSizesStored[0];
             for(unsigned int m = 0; m < M; m++){
                 for(unsigned int k = 0; k < K; k++){
-                    *p++ = asymmetricDistanceComputation_avx(codebook[m][k], y);                     
+                    *p++ = dot_product_i16_avx2(codebook[m][k], a_p, *size_p);
                 }
+                a_p += *size_p++;
             }
-
         }
+
+        int16_t estimatedInnerProduct(unsigned int xi) const {
+            int16_t sum = 0;
+            const uint8_t *p = &pqCodes[xi][0];
+            for(unsigned int m = 0; m < M; m++){
+                sum += queryDistances[K*m + *p++];
+            }
+            return sum; 
+        }
+        
 
         //Distance from PQCode to actual vector
         float quantizationError_simple(typename UnitVectorFormat::Type* vec) const {
@@ -273,14 +287,12 @@ namespace puffinn{
 
         //builds a vector padded to align with each subspace at memory pointed to by "a"
         void createPaddedQueryPoint(typename UnitVectorFormat::Type* y, int16_t *a) const {
-            unsigned int tmp[16] = {0};
             for(unsigned int m = 0; m < M; m++){
                 for(unsigned int i = 0; i < subspaceSizes[m]; i++){
                     *a++ = *y++;
                 }
                 unsigned int padd = 16 - (subspaceSizes[m] % 16);
-                std::copy_n(tmp, padd, a);
-                a += padd;
+                a = std::fill_n(a, padd, 0);
             }
         }  
         
@@ -323,15 +335,6 @@ namespace puffinn{
             return sum;
         }
 
-        int16_t estimatedInnerProduct(unsigned int xi) const {
-            int16_t sum = 0;
-            const uint8_t* p = &pqCodes[xi][0];
-            for(unsigned int m = 0; m < M; m++){
-                sum += queryDistances[*p++ + (m*M)];
-            }
-            return sum; 
-        }
-        
         #else
         int16_t asymmetricDistanceComputation_avx(unsigned int xi, typename UnitVectorFormat::Type* y) const {
             std::cerr << "assymetric avx failed -> no AVX2 found" << std::endl;

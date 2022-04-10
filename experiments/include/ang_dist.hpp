@@ -16,6 +16,9 @@ using namespace puffinn;
 void ang_dist_glove_subset()
 {
     std::cerr << "START ANGULAR DISTS" << std::endl << std::endl;
+#ifdef __AVX2__
+    std::cerr << "USING AVX2" << std::endl;
+#endif
     struct utils::Timer t;
     t.start();
     // setup
@@ -23,7 +26,7 @@ void ang_dist_glove_subset()
     Dataset<UnitVectorFormat> test(0,0);
     std::pair<int,int> train_dim = utils::load<UnitVectorFormat>(train, "train", DATA_PATH, 100000);
     std::pair<int,int> test_dim = utils::load<UnitVectorFormat>(test, "test", DATA_PATH, 100);
-    H5::H5File *file = new H5::H5File("experiments/results/glove-25-100k-100.hdf5", H5F_ACC_TRUNC);
+    H5::H5File *file = new H5::H5File("experiments/results/test.hdf5", H5F_ACC_TRUNC);
 
     hsize_t dims[2] = {test_dim.first, train_dim.first};
     H5::DataSpace space(2, dims);
@@ -42,21 +45,24 @@ void ang_dist_glove_subset()
     true_inner_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
 
     // Calculating & writing results
-    for (int m = 1; m < 9; m*=2) {
+    for (int m = 8; m < 9; m*=2) {
         std::cerr << "RUN M=" << m << std::endl;
         std::ostringstream ss; ss << m << "m";
         H5::Group *grp = new H5::Group(file->createGroup(ss.str()));
         puffinn::PQFilter filter(train, m, 256);
+        filter.rebuild();
 
         // calculate asymmetric distance
         for (int j = 0; j < test_dim.first; j++) {
+            filter.precomp_query_to_centroids(test[j]);
             for (int i = 0; i < train_dim.first; i++) {
-                result_arr[j*train_dim.first + i] = filter.asymmetricDistanceComputation(train[i], test[j]);
+                result_arr[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(filter.estimatedInnerProduct(i));
             }
         }
         H5::DataSet *asym_data = new H5::DataSet(grp->createDataSet("Asymmetric_distance", H5::PredType::NATIVE_FLOAT, space));
         asym_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
 
+/*
         // calculate symmetric distance
         for (int j = 0; j < test_dim.first; j++) {
             for (int i = 0; i < train_dim.first; i++) {
@@ -65,6 +71,7 @@ void ang_dist_glove_subset()
         }
         H5::DataSet *sym_data = new H5::DataSet(grp->createDataSet("Symmetric_distance", H5::PredType::NATIVE_FLOAT, space));
         sym_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
+*/
     }
 
     delete[] result_arr;

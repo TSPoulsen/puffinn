@@ -593,10 +593,8 @@ namespace puffinn {
             assert(pq);
             SearchBuffers buffers(lsh_maps, hash_state);
 
-            alignas(32) int16_t paddedY[pq->getPadSize()];
-            pq->createPaddedQueryPoint(query, paddedY);
-            pq->precomp_query_to_centroids(paddedY);
-            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(-1.0f);
+            pq->precomp_query_to_centroids(query);
+            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(0.0f);
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);
                 for (uint_fast32_t range_idx=0; range_idx < buffers.num_ranges; range_idx++) {
