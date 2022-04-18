@@ -33,14 +33,14 @@ Format for PQ:
 - [x] Implement simple PQ Code function
 - [x] Do not store PQ codes explicitly
 - [x] deciding sizes when $d/M \mod 2 \ne 0$ -> we can avoid this issue by carefully selecting m and adding filler 0's on the vectores (this becomes better with random permutation??)
-- [ ] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
+- [x] Begin writing related work for original PQ paper and litterature related to that as well (llyod algo).
 - [x] Make PQ and Kmeans work for UnitVectorFormat (and only this as realVectorFormat doesn't work for LSH indexing)
   - [x] Kmeans
   - [x] PQ
 - [x] Test quantization error
 - [ ] Begin writing formal problem definition of ANN
 - [x] Create quick testing setup using acutal data (Investigate if ANN-Benchmark can be used through small datasample and only 1 not all datasets)
-- [ ] Look at previous bsc. projects of what is included and to what level of expertize.
+- [x] Look at previous bsc. projects of what is included and to what level of expertize.
 - [x] Use Float inside kmeans instead of UnitVectorFormat (can be better optimized and shouldn't be a problem for space usage) 
   - [x] Get SIMD  to work for subspaces
   - [x] Use SIMD in mahalanobis distance
@@ -48,9 +48,10 @@ Format for PQ:
 - [ ] Make cost benefit of using SIMD for asymmetric (fraction of padding)
 - [ ] Filter passing Criteria for PQFilter (+10exp)
 - [ ] Implement PQ as filter with Early stop (martin has to explain code)
-- [ ] Codebook formatted for faster precomputation
+- [x] Codebook formatted for faster precomputation
 - [x] Make Index work with all similarity measures
 - [x] Don't run lloyd multiple times just increase # of iterations
+- [ ] Investigate whether distance estimation ever can overflow (might be why we have seen negative values sometimes when inner product was high)
 
 
 #### Agenda for next meeting
