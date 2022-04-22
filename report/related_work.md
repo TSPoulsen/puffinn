@@ -18,7 +18,7 @@ Put simply:
 such that for each pair $x, y \in X$ and a random $h \in H$, for arbitrary $q \in X$,
 whenever $dist(q, x) \leq dist(q, y)$ we have $p(q, x) := Pr [h(q) = h(x)] \geq Pr [h(q) = h(y)]$"* &nbsp; [1]
 
-This means that the more similiar points are the more likely their hash value is to be the same.
+This means that the more similiar points are the more likely their hash value is to be the same (Rephrase sentence).
 The LSH-family currently used in PUFFINN for sketching is SimHash.  
 SimHash was originally introduced in [2] (I think) and the variant used in PUFFINN works by creating a random hyperplane at the origin, and then creates a 1-bit hash depending on which side of the hyperplane a point is located.
 This is then done $w$ times to create sketches of size $w$.
@@ -30,7 +30,7 @@ Similarity is then estimated by counting the number of collisions between two su
 The paper [3] introduces a new method that uses concomitants of extreme order statistics.
 Let $r,x,q \in \mathbb{R}^d$ where $r$ is a Guassian random vector with coordinates sampled from $N(0,1)$, $q$ is a query vector and $x$ is a database vector.
 Performing $Q = q^Tr$ and $X = x^Tr$  against $D$ instances of $r$ creates a set of pairs,
-in where the concomitant of the highest value of $Q$,
+in where the concomitant of the highest value of $Q$,(I don't get this)
 referred to as $X_{[1]}$, has the property that $\mathbb{E} \left[ \frac{X_{[1]}}{\sqrt{2logD}} \right] = q^Tx$. Thus meaning it can be used as an unbiased estimator for the inner product between two vectors, regardless of distributions of queries and database.
 
 
@@ -41,7 +41,7 @@ referred to as $X_{[1]}$, has the property that $\mathbb{E} \left[ \frac{X_{[1]}
 All the product quantization techniques we will discuss perform _k_-means clustering, and the most well known procedure for performing _k_-means clustering is the Llyod algorithm
 The algorithm in all its simplicity can be described as
 - __Intitialize centroids__; either through random sampling points or using the kmeans++ initialization method  
-- __Partition points__ such that each point is partitioned to the centroid that minimizes the chosen loss function $$x_{k}=arg\min_{k}\mathcal{d}(x,c_{k})$$
+- __Partition points__ such that each point is partitioned to the centroid that minimizes the chosen loss function $x_{k}=arg\min_{k}\mathcal{d}(x,c_{k})$
 - __Update centroids__ such that minimal average loss is achieved between the centroid and all points partitioned to it.
 
 The last 2 steps are iterated until either convergance or some stopping criterion is reached.  
@@ -52,9 +52,9 @@ The main differences between the following methods, are their choice of loss fun
 
 Produc Quantization (PQ) has been around for many years, and a general outline and history of it can be found in [6].
 PQ produce sketches by dividing each vector into $M$ subspaces, most often a point's $M$ cartesian subspaces.
-Then each subspace is then quantized independently into $K$ centroids, thus forming the codebook $C$.
-Each subspace is most often quantized using the Llyod algorithm, to product the $K$ centroids.  
-The indicies of each centroid that a point is closest to in each subspace, then make up the sketch of that point.   
+Then each subspace is then quantized independently into $K$ centroids (other word than centroids?), thus forming the codebook $C$.
+Each subspace is most often quantized using the Llyod algorithm, to produce the $K$ centroids.  
+The indicies of each centroid that a point is closest to in each subspace, make up the sketch of that point.   
 More formally the sketch of a point is: (IT IS NOT A SET, BUT I DON'T KNOW HOW ELSE TO WRITE IT)
 $$ \hat{x} = \{ c_x^{(0)}, c_x^{(1)}, ..., c_x^{(M)}\}$$
 Where $c^{(m)}_x$ is the index of the centroid that data point $x$ is partitioned to in subspace $m$, thus $c^{(m)}_x = arg\min_k\mathcal{d}(x^{(m)},C^{(m)}_k)$, where $C^{(m)}_k$ is the $k$ 'th centriod in subspace $m$ and $\mathcal{d}$ is the distance function.
