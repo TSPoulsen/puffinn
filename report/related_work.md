@@ -36,30 +36,44 @@ referred to as $X_{[1]}$, has the property that $\mathbb{E} \left[ \frac{X_{[1]}
 
 ### Product Quantization
 
-Formalities:
-- $K$ is number of centroids $k$ is a specific centroid
-- $M$ is number of subspaces $m$ is a specific subspace (cartesian)
-- $C$ is the whole Codebook and $C^{(m)}$ is the codebook for subspace $m$ and $C^{(m)}_k$ is the _k_'th codebook centroid in the _m_'th subspace
-- $c^{(m)}_x$ is the index of the centroid that data point $x$ is partitioned to in subspace $m$, thus $c^{(m)}_x = arg\min_k\ell(x^{(m)},C^{(m)}_k)$
-
 <br>
 
 All the product quantization techniques we will discuss perform _k_-means clustering, and the most well known procedure for performing _k_-means clustering is the Llyod algorithm
 The algorithm in all its simplicity can be described as
-- __Intitialize centroids__; either through random sampling points or using the kmeans++ initialization method
-- __Partition points__ such that each point is partitioned to the centroid that minimizes the chosen loss function ($x_k = arg\min_k\ell(x,c_k)$)
+- __Intitialize centroids__; either through random sampling points or using the kmeans++ initialization method  
+- __Partition points__ such that each point is partitioned to the centroid that minimizes the chosen loss function $$x_{k}=arg\min_{k}\mathcal{d}(x,c_{k})$$
 - __Update centroids__ such that minimal average loss is achieved between the centroid and all points partitioned to it.
 
-The last 2 steps are iterated until either convergance is reached or some stopping criterion.
+The last 2 steps are iterated until either convergance or some stopping criterion is reached.  
 The main differences between the following methods, are their choice of loss function for the llyod algorithm.
 
 #### Origin of Product Quantization
 
-##### Missing f\*cking description of PQ
+
+Produc Quantization (PQ) has been around for many years, and a general outline and history of it can be found in [6].
+PQ produce sketches by dividing each vector into $M$ subspaces, most often a point's $M$ cartesian subspaces.
+Then each subspace is then quantized independently into $K$ centroids, thus forming the codebook $C$.
+Each subspace is most often quantized using the Llyod algorithm, to product the $K$ centroids.  
+The indicies of each centroid that a point is closest to in each subspace, then make up the sketch of that point.   
+More formally the sketch of a point is: (IT IS NOT A SET, BUT I DON'T KNOW HOW ELSE TO WRITE IT)
+$$ \hat{x} = \{ c_x^{(0)}, c_x^{(1)}, ..., c_x^{(M)}\}$$
+Where $c^{(m)}_x$ is the index of the centroid that data point $x$ is partitioned to in subspace $m$, thus $c^{(m)}_x = arg\min_k\mathcal{d}(x^{(m)},C^{(m)}_k)$, where $C^{(m)}_k$ is the $k$ 'th centriod in subspace $m$ and $\mathcal{d}$ is the distance function.
+
+The bit-size of a sketch is therefore determined by $\lceil \log_2 K \rceil \cdot  M$. Common values of $K$ and $M$ are $256$ and $8$ respectively, which means sketches are 64-bit.
+Reconstruction of a point is then done by concatenating the $M$ centriods gotten from the sketch into a single vector 
+$$\hat{x} = \left[ C[c^{(0)}_x];C[c^{(1)}_x];...;C[c^{(M)}_x]  \right]$$
+and the reconstruction error is the defined as: $e_x = \ell(x, \hat{x})$ Which is the loss function that in the end is used to derive the distance function that minimizes total loss in the Llyod algorithm.
+
+In the context of ANN, PQ works well because the distance bewteen a query and all centroids can be precomputed in $O(D \cdot K)$ and then distance between any given point and the query can be calculated in $O(M)$.
+So for a query set of size $Q$ and a dataset of size $N$ and each point has dimension $D$, distances between all queries and all points in the dataset can be done in $O(Q  D  K + N  M)$ which is compared to $O(Q  D  N)$ for computing true distances.
+When $N \gg K$ using PQ as a sketching technique is much less computationally expensive.
+
 [4] was the first paper to use Product (or also Called vector-?) quantization (PQ) for nearest neighbour search.
-In their paper they use euclidean distance as their similarity measure, and thus describes PQ using Mean Squared Error (MSE) as their loss function.
+In their paper they use Mean Squared Error (MSE) as their loss function, which leads the distance function to be euclidean distance.
 Their results show that PQ gives good estimates for euclidean distance, and proved both efficient and effective. 
-They compare using a symmetric to an asymmetric method (SDC vs ADC) when calculating the distance between a query point and a quantized dataset point.
+They compare two ways of computing distances between a query and a quantized dataset, called Asymmetric- vs Symmetric distance computation (ADC vs SDC).
+The two methods differ in that SDC quantize the query vector using the codebook learned from the dataset, and then calculates the distance to points using the quantized version of the query, whereas ADC calculates the distances using the original query.
+
 Both their theoretical and emperical results find that using the asymmetric distance was better, as it lead to a lesser biased distance estimator and also higher recalls when using it for ANN search.
 It discusses the theoretical time and memory complexities for both SDC, ADC and show that they are equal in both encoding a vector and estimating distance to a query.
 
@@ -98,12 +112,21 @@ This fact thus leads to the realization that in the classical llyod algorithm fo
 
 The last two are what satisfy Llyod optimality conditions
 
+Formalities:
+- $K$ is number of centroids $k$ is a specific centroid
+- $M$ is number of subspaces $m$ is a specific subspace (cartesian)
+- $C$ is the whole Codebook and $C^{(m)}$ is the codebook for subspace $m$ and $C^{(m)}_k$ is the _k_'th codebook centroid in the _m_'th subspace
+- $c^{(m)}_x$ is the index of the centroid that data point $x$ is partitioned to in subspace $m$, thus $c^{(m)}_x = arg\min_k\ell(x^{(m)},C^{(m)}_k)$
+
+
 for_editor
 
 
-[1] PUFFINN: Parameterless and Universally Fast FInding of Nearest Neighbors
-[2] Similarity estimation techniques from rounding algorithms
-[3] Sublinear Maximum Inner Product Search using Concomitants of Extreme Order Statistics (Ninh Pham)
-[4] Product quantization for nearest neighbor search (Schmid et al)
-[5] Quantization based Fast Inner Product Search (Guo et al)
+[1] PUFFINN: Parameterless and Universally Fast FInding of Nearest Neighbors  
+[2] Similarity estimation techniques from rounding algorithms  
+[3] Sublinear Maximum Inner Product Search using Concomitants of Extreme Order Statistics (Ninh Pham)  
+[4] Product quantization for nearest neighbor search (Schmid et al)  
+[5] Quantization based Fast Inner Product Search (Guo et al)  
+[6] Quantization (David L. Neuhoff et al)
+
 
