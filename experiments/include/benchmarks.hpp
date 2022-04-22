@@ -67,12 +67,12 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
 {
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
-    auto dims = utils::load(data, "train", data_path, 10000);
+    auto dims = utils::load(data, "train", data_path, 50000);
     puffinn::Dataset<puffinn::UnitVectorFormat> ds(data[0].size(), data.size());    
     for(std::vector<float> v: data){
         ds.insert(v);
     }
-    puffinn::PQFilter pq1(ds, 2, 256);
+    puffinn::PQFilter pq1(ds, 4, 256);
     pq1.rebuild();
     alignas(32) int16_t tmp[pq1.getPadSize()];
     pq1.createPaddedQueryPoint(ds[110], tmp);
@@ -118,24 +118,18 @@ void imp(ankerl::nanobench::Bench *bencher){
 
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
-    auto dims = utils::load(data, "train", data_path, 200000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
+    auto dims = utils::load(data, "train", data_path, 500000);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 1024*1024*1024);
     for (std::vector<float> & v : data) { index.insert(v); }
-    index.rebuild();
-    std::vector<float> query = {-0.633   , -0.33511 ,  0.52545 ,  0.092909, -0.97386 , -1.3496  ,
-       -1.9191  , -0.76974 ,  0.34711 , -1.1012  , -0.31359 ,  0.66227 ,
-        0.11019 , -0.70333 ,  1.0159  , -0.1288  ,  0.37742 ,  0.35706 ,
-       -0.1153  ,  0.19528 ,  0.36092 ,  0.92362 , -0.92318 ,  0.42094 ,
-        0.4587};
-      
+    index.rebuild();  
     bencher->run("search with Simple", [&] {
-        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::Simple);
+        std::vector<uint32_t> result = index.search(data[1420], 20, 0.1, puffinn::FilterType::Simple);
     });
-    bencher->run("search with None", [&] {
-        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::None);
-    });
+    //bencher->run("search with None", [&] {
+        //std::vector<uint32_t> result = index.search(query, 10, 0.1, puffinn::FilterType::None);
+    //});
     bencher->run("search with PQ_simple", [&] {
-        std::vector<uint32_t> result = index.search(query, 10, 0.9, puffinn::FilterType::PQ_Simple);
+        std::vector<uint32_t> result = index.search(data[1420], 20, 0.1, puffinn::FilterType::PQ_Simple);
     });
 
     /*   
@@ -146,14 +140,55 @@ void imp(ankerl::nanobench::Bench *bencher){
     */   
 }
 
+void correctnessMeassurementPQ(){
+
+    std::vector<std::vector<float>> data;
+    std::string data_path = "data/glove-25-angular.hdf5";
+    int n = 50000;
+    int topK = 10;
+    auto dims = utils::load(data, "train", data_path, n);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
+    for (std::vector<float> & v : data) { index.insert(v); }
+    index.rebuild();  
+    for(int i = 0; i <n; i++){
+        std::vector<uint32_t> guess = index.search(data[i], topK, 0.1, puffinn::FilterType::PQ_Simple);
+        std::vector<uint32_t> ans = index.search(data[i], topK, 0.1, puffinn::FilterType::None);
+        
+        std::sort(guess.begin(), guess.end());
+        std::sort(ans.begin(), ans.end());
+        
+        std::vector<uint32_t> v(topK);
+        std::vector<uint32_t>::iterator it;
+        
+        it = std::set_intersection(guess.begin(), guess.end(), ans.begin(), ans.end(),v.begin());
+        std::cout << i << "," << (it - v.begin())<< std::endl;
+    }
+
+}
+
+void qualityAsProg(){
+    std::vector<std::vector<float>> data;
+    std::string data_path = "data/glove-25-angular.hdf5";
+    auto dims = utils::load(data, "train", data_path, 100000);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
+    for (std::vector<float> & v : data) { index.insert(v); }
+    index.rebuild();
+    for(int i = 0; i < 500; i++){
+        index.search(data[i*100], 10, 0.95, puffinn::FilterType::PQ_Simple);
+    }
+    
+}
+
 void all_bench()
 {
     ankerl::nanobench::Bench bencher;
     bencher.minEpochIterations(2000);
+    //correctnessMeassurementPQ();
     imp(&bencher);
     //mahaBench(&bencher);
     //eucBench(&bencher);
 
+    //qualityAsProg();
     //bencher.minEpochIterations(10);
     //bencher.minEpochIterations(10);
     //pqfBench(&bencher);

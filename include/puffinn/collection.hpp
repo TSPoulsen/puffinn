@@ -139,7 +139,7 @@ namespace puffinn {
             // Construct PQFilter if correct similarity measure and it is requested
             if (use_pq) {
                 if constexpr (std::is_same<CosineSimilarity, TSim>::value) 
-                    pq = std::unique_ptr<PQFilter>(new PQFilter(dataset, 2, 32));
+                    pq = std::unique_ptr<PQFilter>(new PQFilter(dataset, 4, 256));//, KMeans::distanceType::mahalanobis));
             }
             static_assert(
                 std::is_same<TSim, typename THash::Sim>::value
@@ -594,7 +594,8 @@ namespace puffinn {
             SearchBuffers buffers(lsh_maps, hash_state);
 
             pq->precomp_query_to_centroids(query);
-            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(0.0f);
+            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(pq->bootThreshold);
+            //std::cout << "this is the boot threshold: " << pq->getBootThreshold() << std::endl;
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);
                 for (uint_fast32_t range_idx=0; range_idx < buffers.num_ranges; range_idx++) {
@@ -606,11 +607,14 @@ namespace puffinn {
                                 query,
                                 dataset[idx],
                                 dataset.get_description());
+                            //std::cout << (int) depth << "," <<range_idx << "," <<UnitVectorFormat::from_16bit_fixed_point(pq->estimatedInnerProduct(idx))  << "," << UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(query, dataset[idx], dataset.get_description().storage_len)) << std::endl;
                             maxbuffer.insert(idx, dist);
                         }
                         range.first++;
                     }
                     auto kth_similarity = maxbuffer.smallest_value();
+                    limit = UnitVectorFormat::to_16bit_fixed_point((kth_similarity*2)-1.0);
+
                 }
                 g_performance_metrics.store_time(Computation::Consider);
                 g_performance_metrics.start_timer(Computation::CheckTermination);

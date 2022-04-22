@@ -10,6 +10,7 @@ namespace puffinn{
     class PQFilter{
         unsigned int M, dims;
         unsigned int K;
+        unsigned int LIM;
         const KMeans::distanceType MODE;
         //codebook that contains m*k centroids
         std::vector<Dataset<UnitVectorFormat>> codebook;
@@ -23,6 +24,7 @@ namespace puffinn{
         std::vector<unsigned int> subspaceSizes, offsets = {0}, subspaceSizesStored;
         bool is_build = false;
     public:
+        float bootThreshold = 0.0f;
         
         ///Builds short codes for vectors using Product Quantization by projecting every subspace down to neigherst kmeans cluster
         ///Uses these shortcodes for fast estimation of inner product between vectors  
@@ -31,7 +33,7 @@ namespace puffinn{
         ///@param m Number of subspaces to split the vectors in, distributes sizes as uniformely as possible
         ///@param k Number of clusters for each subspace, build using kmeans
         ///@param mode The distance meassure that kmeans will use. Currently supportes -> ("euclidian, "mahalanobis")   
-        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 16, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
+        PQFilter(Dataset<UnitVectorFormat> &dataset, unsigned int m = 8, unsigned int k = 256, KMeans::distanceType mode = KMeans::euclidean)
         :M(m),
         dims(dataset.get_description().args),
         K(k),
@@ -39,12 +41,14 @@ namespace puffinn{
         dataset(dataset)
         {
             subspaceSizes.resize(M);
+            assert(m%4 == 0);
             fill(subspaceSizes.begin(), subspaceSizes.end(), dims/M);
             unsigned int leftover = dims - ((dims/M) * M);
             for(auto i = subspaceSizes.begin(); i != subspaceSizes.begin()+leftover; i++) (*i)++;
             auto p = subspaceSizes.begin();
             for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ *p++);
             queryDistances = new int16_t[K*M];
+            LIM = K*M;
         }
 
         ~PQFilter(){
@@ -64,6 +68,7 @@ namespace puffinn{
             pqCodes.resize(dataset.get_size());
             createCodebook();
             createDistanceTable();
+            bootThreshold = bootStrapThreshold(100u, 5000u, 20u);
             is_build = true;
         }
 
@@ -157,7 +162,7 @@ namespace puffinn{
                         *c_p++ = UnitVectorFormat::to_16bit_fixed_point(*vec_p++);
                     }
                 }
-                //Sizes of the padded subspaces  
+                //Sizes of the padded subspaces r
                 subspaceSizesStored.push_back(codebook[m].get_description().storage_len);
             }
         }
@@ -200,8 +205,11 @@ namespace puffinn{
         int16_t estimatedInnerProduct(unsigned int xi) const {
             int16_t sum = 0;
             const uint8_t *p = &pqCodes[xi][0];
-            for(unsigned int m = 0; m < M; m++){
-                sum += queryDistances[K*m + *p++];
+            for(unsigned int var = 0; var < LIM; var += 4*K, p+=4){
+                sum += queryDistances[var + *p];
+                sum += queryDistances[var +   K + *(p+1)];
+                sum += queryDistances[var + 2*K + *(p+2)];
+                sum += queryDistances[var + 3*K + *(p+3)];
             }
             return sum; 
         }
@@ -358,6 +366,28 @@ namespace puffinn{
             return sum;
         }
 
+        float bootStrapThreshold(unsigned int nruns = 150, unsigned int sizeOfRun = 5000, unsigned int topK = 25){
+            auto &rand_gen = get_default_random_generator();
+            std::uniform_int_distribution<unsigned int> random_idx(0, dataset.get_size()-1);
+            std::unordered_set<unsigned int> used; 
+            float sumOfThresholds = 0.0;
+            while (used.size() < nruns)
+            {
+                unsigned int bootQuery = random_idx(rand_gen);
+                
+                if(used.find(bootQuery) == used.end()){
+                    MaxBuffer maxbuffer(topK);
+                    for(unsigned int i = 0; i < sizeOfRun; i++){
+                        unsigned int idx = random_idx(rand_gen);
+                        int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
+                        maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));
+                    }
+                    sumOfThresholds += maxbuffer.smallest_value();
+                    used.insert(bootQuery);
+                }   
+            }
+            return sumOfThresholds/nruns;            
+        }
 
         //Functions below are just debugging tools and old code that might be useful down the road
         /*
