@@ -68,8 +68,8 @@ public:
     {
     }
 
-    AngularIndex(unsigned int dimensions, uint64_t memory_limit, const HashSourceArgs<T>& hash_args)
-      : table(dimensions, memory_limit, hash_args)
+    AngularIndex(unsigned int dimensions, uint64_t memory_limit, const bool use_pq, const HashSourceArgs<T>& hash_args)
+      : table(dimensions, memory_limit, use_pq, hash_args)
     {
     }
 
@@ -158,7 +158,7 @@ public:
         uint64_t memory_limit,
         const HashSourceArgs<T>& hash_args
     ) 
-      : table(dimensions, memory_limit, hash_args) 
+      : table(dimensions, memory_limit, false, hash_args) 
     {
     }
 
@@ -230,7 +230,8 @@ public:
         std::string metric,
         unsigned int dimensions,
         uint64_t memory_limit,
-        const py::kwargs& kwargs
+        const py::kwargs& kwargs,
+        const bool use_pq = false
     ) {
         if (metric == "angular") {
             init_angular(dimensions, memory_limit, kwargs);
@@ -457,20 +458,27 @@ private:
         if (kwargs.contains("hash_function")) {
             hash_function = py::cast<std::string>(kwargs["hash_function"]);
         }
+        bool use_pq = false;
+        if (kwargs.contains("use_pq")) {
+            use_pq = py::cast<bool>(kwargs["use_pq"]);
+        }
         if (hash_function == "simhash") {
             real_table = std::make_unique<AngularIndex<SimHash>>(
                 dimensions,
                 memory_limit,
+                use_pq,
                 *get_hash_source_args<SimHash>(kwargs));
         } else if (hash_function == "crosspolytope") {
             real_table = std::make_unique<AngularIndex<CrossPolytopeHash>>(
                 dimensions,
                 memory_limit,
+                use_pq,
                 *get_hash_source_args<CrossPolytopeHash>(kwargs));
         } else if (hash_function == "fht_crosspolytope") {
             real_table = std::make_unique<AngularIndex<FHTCrossPolytopeHash>>(        
                 dimensions,
                 memory_limit,
+                use_pq,
                 *get_hash_source_args<FHTCrossPolytopeHash>(kwargs));
         } else {
             throw std::invalid_argument("hash_function");
