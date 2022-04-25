@@ -129,14 +129,19 @@ namespace puffinn{
 
         //builds a dataset where each vector only contains the mth chunk
         std::vector<std::vector<float>> getSubspace(unsigned int m) {
-            unsigned int N = dataset.get_size();
+            // If dataset is large use at most 100.000 points for PQ
+            unsigned int N = std::min(dataset.get_size(), SAMPLE_SIZE);
+
+            std::vector<unsigned int> s_idcs = sample_idcs(N);
+
             std::vector<std::vector<float>> subspace(N, std::vector<float>(subspaceSizes[m]));
-            for (unsigned int i = 0; i < N; i++) {
-                UnitVectorFormat::Type *start = dataset[i] + offsets[m];
+            unsigned int subspace_idx = 0;
+            for (unsigned int idx : s_idcs) {
+                UnitVectorFormat::Type *start = dataset[idx] + offsets[m];
                 for (unsigned int d = 0; d < subspaceSizes[m]; d++) {
-                    subspace[i][d] = UnitVectorFormat::from_16bit_fixed_point(*(start + d));
-                    
+                    subspace[subspace_idx][d] = UnitVectorFormat::from_16bit_fixed_point(*(start + d));
                 }
+                subspace_idx++;
             }
             return subspace;
         }
@@ -378,25 +383,40 @@ namespace puffinn{
         }
 
         // Fisher–Yates_shuffle
+        std::vector<unsigned int> sample_idcs(unsigned int size)
+        {
+            auto &gen = get_default_random_generator();
+            unsigned int N = dataset.get_size();
+            assert(size <= N);
+            std::vector<unsigned int> res(size);
+            for (unsigned int i = 0; i != N; ++i) {
+                std::uniform_int_distribution<unsigned int> dis(0, i);
+                std::size_t j = dis(gen);
+                if (j < res.size()) {
+                    if (i < res.size()) {
+                        res[i] = res[j];
+                    }
+                    res[j] = i;
+                }
+            }
+            for (unsigned int idx : res) {
+                assert(idx < N);
+            }
+            return res;
+        }
+
         float bootStrapThreshold(unsigned int nruns = 150, unsigned int sizeOfRun = 5000, unsigned int topK = 25){
-            auto &rand_gen = get_default_random_generator();
-            std::uniform_int_distribution<unsigned int> random_idx(0, dataset.get_size()-1);
-            std::unordered_set<unsigned int> used; 
+            std::vector<unsigned int> q_idcs = sample_idcs(std::min(nruns,dataset.get_size()));
             float sumOfThresholds = 0.0;
-            while (used.size() < nruns)
+            for (unsigned int bootQuery : q_idcs)
             {
-                unsigned int bootQuery = random_idx(rand_gen);
-                
-                if(used.find(bootQuery) == used.end()){
                 MaxBuffer maxbuffer(topK);
-                    for(unsigned int i = 0; i < sizeOfRun; i++){
-                        unsigned int idx = random_idx(rand_gen);
+                std::vector<unsigned int> d_idcs = sample_idcs(std::min(sizeOfRun, dataset.get_size()));
+                for (unsigned int idx : d_idcs) {
                     int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
                     maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));
                 }
                 sumOfThresholds += maxbuffer.smallest_value();
-                    used.insert(bootQuery);
-                }   
             }
             return sumOfThresholds/nruns;            
         }
