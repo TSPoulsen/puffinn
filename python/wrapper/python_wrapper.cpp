@@ -466,7 +466,7 @@ private:
     void init_angular(unsigned int dimensions, uint64_t memory_limit, const py::kwargs& kwargs) {
         std::string hash_function = "fht_crosspolytope";
         bool use_pq = true;
-        uint32_t K=256,M=8;
+        unsigned int K=256,M=8;
         KMeans::distanceType kmeans_loss = KMeans::euclidean;
 
         if (kwargs.contains("hash_function")) {
@@ -476,10 +476,10 @@ private:
             use_pq = py::cast<bool>(kwargs["use_pq"]);
         }
         if (kwargs.contains("K")) {
-            K = py::cast<uint32_t>(kwargs["K"]);
+            K = py::cast<unsigned int>(kwargs["K"]);
         }
         if (kwargs.contains("M")) {
-            M = py::cast<uint32_t>(kwargs["M"]);
+            M = py::cast<unsigned int>(kwargs["M"]);
         }
         if (kwargs.contains("loss")) {
             std::string loss = py::cast<std::string>(kwargs["loss"]);
@@ -559,7 +559,7 @@ py::tuple Index::reduce() {
     );
 }
 
-PYBIND11_MODULE(puffinnPQ, m) {
+PYBIND11_MODULE(puffinn, m) {
     py::class_<Index>(m, "Index")
         .def(py::init<const std::string&, const unsigned int&, const uint64_t&, const py::kwargs&>())
         .def("insert", &Index::insert)
