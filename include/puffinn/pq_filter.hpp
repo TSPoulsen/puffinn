@@ -1,10 +1,13 @@
 #pragma once
 #include "puffinn/dataset.hpp"
+#include "puffinn/maxbuffer.hpp"
 #include "puffinn/kmeans.hpp"
 #include "math.h"
 #include <vector>
 #include <cfloat>
 #include <iostream>
+
+
 namespace puffinn{
 
     class PQFilter{
@@ -12,6 +15,7 @@ namespace puffinn{
         unsigned int K;
         unsigned int LIM;
         const KMeans::distanceType MODE;
+        const unsigned int SAMPLE_SIZE = 100000u;
         //codebook that contains m*k centroids
         std::vector<Dataset<UnitVectorFormat>> codebook;
         //precomputed inter-centroid distances for faster symmetric distance computation
@@ -40,6 +44,11 @@ namespace puffinn{
         MODE(mode),
         dataset(dataset)
         {
+            std::cout << "constructing PQFilter with k=" << K << " m=" << M;
+            if (mode == KMeans::euclidean) std::cout << " and mode=euc";
+            else std::cout << " and mode=maha";
+            std::cout << std::endl;
+                
             subspaceSizes.resize(M);
             assert(m%4 == 0);
             fill(subspaceSizes.begin(), subspaceSizes.end(), dims/M);
@@ -65,6 +74,7 @@ namespace puffinn{
                 return;
             } 
 
+            std::cout << "rebuilding pq_filter" << std::endl;
             pqCodes.resize(dataset.get_size());
             createCodebook();
             createDistanceTable();
@@ -138,6 +148,7 @@ namespace puffinn{
             //used to keep track of where subspace begins
             for(unsigned int m = 0; m < M ; m++)
             {
+                std::cout << "creating codebook for subspace " << m << std::endl;
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
@@ -366,6 +377,7 @@ namespace puffinn{
             return sum;
         }
 
+        // Fisher–Yates_shuffle
         float bootStrapThreshold(unsigned int nruns = 150, unsigned int sizeOfRun = 5000, unsigned int topK = 25){
             auto &rand_gen = get_default_random_generator();
             std::uniform_int_distribution<unsigned int> random_idx(0, dataset.get_size()-1);
@@ -376,13 +388,13 @@ namespace puffinn{
                 unsigned int bootQuery = random_idx(rand_gen);
                 
                 if(used.find(bootQuery) == used.end()){
-                    MaxBuffer maxbuffer(topK);
+                MaxBuffer maxbuffer(topK);
                     for(unsigned int i = 0; i < sizeOfRun; i++){
                         unsigned int idx = random_idx(rand_gen);
-                        int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
-                        maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));
-                    }
-                    sumOfThresholds += maxbuffer.smallest_value();
+                    int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
+                    maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));
+                }
+                sumOfThresholds += maxbuffer.smallest_value();
                     used.insert(bootQuery);
                 }   
             }

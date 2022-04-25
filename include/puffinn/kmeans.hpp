@@ -68,6 +68,7 @@ namespace puffinn
             N_RUNS(runs),
             MODE(mode)
         {
+            std::cout << "Creating Kmeans with K=" << K << std::endl;
             assert(K <= 256);
             assert(K > 0);
         }
@@ -78,6 +79,7 @@ namespace puffinn
         // Runs N_RUNS times and then chooses the best of those runs
         void fit(dataType &data)
         {
+            std::cout << "Kmeans.fit called" << std::endl;
             assert(K <= data.size());
 
         #if __AVX2__
@@ -136,8 +138,10 @@ namespace puffinn
             double inertia = DBL_MAX;
             unsigned int iteration = 0;
 
+            std::cout << "Kmeans total iterations " << max_iter << " : ";
             while (inertia_delta > TOL && iteration < max_iter )
             {
+                if (iteration%10 == 0) std::cout << iteration << "-" << std::flush;
                 // Step 1 in llyod: assign points to clusters
                 double current_inertia = assignToClusters(data, clusters);
                 // Step 2 in llyod: Set clusters to be center of points in cluster
@@ -154,6 +158,7 @@ namespace puffinn
                 inertia = current_inertia;
                 iteration++;
             }
+            std::cout << std::endl;
             return inertia;
 
         }

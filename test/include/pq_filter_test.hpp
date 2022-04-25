@@ -31,7 +31,7 @@ namespace pq{
     }
     
     TEST_CASE("PQFilter generate correct PQcodes 2") {
-        unsigned int N = 4, dims = 4, m = 2, k = 2;
+        unsigned int N = 4, dims = 4, m = 4, k = 2;
         std::vector<float>  data[N] = {
                                         {-4.0, 1.0, -8.0, 1.0},
                                         {-4.0, 1.0,  8.0,-1.0},

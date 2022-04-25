@@ -495,8 +495,8 @@ private:
                 memory_limit,
                 use_pq,
                 *get_hash_source_args<SimHash>(kwargs),
-                K,
                 M,
+                K,
                 kmeans_loss);
         } else if (hash_function == "crosspolytope") {
             real_table = std::make_unique<AngularIndex<CrossPolytopeHash>>(
@@ -504,8 +504,8 @@ private:
                 memory_limit,
                 use_pq,
                 *get_hash_source_args<CrossPolytopeHash>(kwargs),
-                K,
                 M,
+                K,
                 kmeans_loss);
         } else if (hash_function == "fht_crosspolytope") {
             real_table = std::make_unique<AngularIndex<FHTCrossPolytopeHash>>(        
@@ -513,8 +513,8 @@ private:
                 memory_limit,
                 use_pq,
                 *get_hash_source_args<FHTCrossPolytopeHash>(kwargs),
-                K,
                 M,
+                K,
                 kmeans_loss);
         } else {
             throw std::invalid_argument("hash_function");
