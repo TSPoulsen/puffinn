@@ -559,7 +559,7 @@ py::tuple Index::reduce() {
     );
 }
 
-PYBIND11_MODULE(puffinn, m) {
+PYBIND11_MODULE(puffinnPQ, m) {
     py::class_<Index>(m, "Index")
         .def(py::init<const std::string&, const unsigned int&, const uint64_t&, const py::kwargs&>())
         .def("insert", &Index::insert)
