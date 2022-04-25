@@ -354,7 +354,7 @@ namespace collection {
     ) {
         int k = 50;
 
-        Index<T, H, S> index(args, 50*MB, false, hash_args, sketch_args);
+        Index<T, H, S> index(args, 50*MB, hash_args, sketch_args);
         for (int i=0; i < 1000; i++) {
             index.insert(T::Format::generate_random(args));
         }

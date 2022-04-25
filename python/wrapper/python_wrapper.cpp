@@ -73,6 +73,17 @@ public:
     {
     }
 
+    AngularIndex(unsigned int dimensions,
+        uint64_t memory_limit,
+        const bool use_pq,
+        const HashSourceArgs<T>& hash_args,
+        const unsigned int M,
+        const unsigned int K,
+        KMeans::distanceType mode)
+      : table(dimensions, memory_limit, use_pq, hash_args, M, K, mode)
+    {
+    }
+
     void insert(const std::vector<float>& vec) {
         table.insert(vec);
     }
@@ -230,8 +241,7 @@ public:
         std::string metric,
         unsigned int dimensions,
         uint64_t memory_limit,
-        const py::kwargs& kwargs,
-        const bool use_pq = false
+        const py::kwargs& kwargs
     ) {
         if (metric == "angular") {
             init_angular(dimensions, memory_limit, kwargs);
@@ -455,31 +465,57 @@ private:
 
     void init_angular(unsigned int dimensions, uint64_t memory_limit, const py::kwargs& kwargs) {
         std::string hash_function = "fht_crosspolytope";
+        bool use_pq = true;
+        uint32_t K=256,M=8;
+        KMeans::distanceType kmeans_loss = KMeans::euclidean;
+
         if (kwargs.contains("hash_function")) {
             hash_function = py::cast<std::string>(kwargs["hash_function"]);
         }
-        bool use_pq = false;
         if (kwargs.contains("use_pq")) {
             use_pq = py::cast<bool>(kwargs["use_pq"]);
         }
+        if (kwargs.contains("K")) {
+            K = py::cast<uint32_t>(kwargs["K"]);
+        }
+        if (kwargs.contains("M")) {
+            M = py::cast<uint32_t>(kwargs["M"]);
+        }
+        if (kwargs.contains("loss")) {
+            std::string loss = py::cast<std::string>(kwargs["loss"]);
+            if (loss == "euclidean") kmeans_loss = KMeans::euclidean;
+            else if (loss == "mahalanobis") kmeans_loss = KMeans::mahalanobis;
+            else throw std::invalid_argument("loss");
+        }
+
+
         if (hash_function == "simhash") {
             real_table = std::make_unique<AngularIndex<SimHash>>(
                 dimensions,
                 memory_limit,
                 use_pq,
-                *get_hash_source_args<SimHash>(kwargs));
+                *get_hash_source_args<SimHash>(kwargs),
+                K,
+                M,
+                kmeans_loss);
         } else if (hash_function == "crosspolytope") {
             real_table = std::make_unique<AngularIndex<CrossPolytopeHash>>(
                 dimensions,
                 memory_limit,
                 use_pq,
-                *get_hash_source_args<CrossPolytopeHash>(kwargs));
+                *get_hash_source_args<CrossPolytopeHash>(kwargs),
+                K,
+                M,
+                kmeans_loss);
         } else if (hash_function == "fht_crosspolytope") {
             real_table = std::make_unique<AngularIndex<FHTCrossPolytopeHash>>(        
                 dimensions,
                 memory_limit,
                 use_pq,
-                *get_hash_source_args<FHTCrossPolytopeHash>(kwargs));
+                *get_hash_source_args<FHTCrossPolytopeHash>(kwargs),
+                K,
+                M,
+                kmeans_loss);
         } else {
             throw std::invalid_argument("hash_function");
         }

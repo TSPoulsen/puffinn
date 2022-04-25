@@ -9,6 +9,7 @@
 #include "puffinn/maxbuffer.hpp"
 #include "puffinn/prefixmap.hpp"
 #include "pq_filter.hpp"
+#include "kmeans.hpp"
 #include "puffinn/typedefs.hpp"
 //#include "puffinn/kmeans.hpp"
 
@@ -127,7 +128,6 @@ namespace puffinn {
         Index(
             typename TSim::Format::Args dataset_args,
             uint64_t memory_limit,
-            const bool use_pq = true,
             const HashSourceArgs<THash>& hash_args = IndependentHashArgs<THash>(),
             const HashSourceArgs<TSketch>& sketch_args = IndependentHashArgs<TSketch>()
         )
@@ -136,17 +136,38 @@ namespace puffinn {
             memory_limit(memory_limit),
             hash_args(hash_args.copy())
         {
-            // Construct PQFilter if correct similarity measure and it is requested
-            if (use_pq) {
-                if constexpr (std::is_same<CosineSimilarity, TSim>::value) 
-                    pq = std::unique_ptr<PQFilter>(new PQFilter(dataset, 4, 256));//, KMeans::distanceType::mahalanobis));
-            }
             static_assert(
                 std::is_same<TSim, typename THash::Sim>::value
                 && std::is_same<TSim, typename TSketch::Sim>::value,
                 "Hash function not applicable to similarity measure");
         }
 
+        Index(
+            typename TSim::Format::Args dataset_args,
+            uint64_t memory_limit,
+            const bool use_pq = true,
+            const HashSourceArgs<THash>& hash_args = IndependentHashArgs<THash>(),
+            const unsigned int M = 8,
+            const unsigned int K = 256,
+            const KMeans::distanceType mode = KMeans::euclidean,
+            const HashSourceArgs<TSketch>& sketch_args = IndependentHashArgs<TSketch>()
+        )
+          : dataset(Dataset<typename TSim::Format>(dataset_args)),
+            filterer(sketch_args, dataset.get_description()),
+            memory_limit(memory_limit),
+            hash_args(hash_args.copy())
+        {
+            static_assert(
+                std::is_same<TSim, typename THash::Sim>::value
+                && std::is_same<TSim, typename TSketch::Sim>::value,
+                "Hash function not applicable to similarity measure");
+
+            // Construct PQFilter if correct similarity measure and it is requested
+            if (use_pq) {
+                if constexpr (std::is_same<CosineSimilarity, TSim>::value) 
+                    pq = std::unique_ptr<PQFilter>(new PQFilter(dataset, M, K, mode));
+            }
+        }
         /// Deserialize an index.
         ///
         /// It is assumed that the input data is a serialized index
