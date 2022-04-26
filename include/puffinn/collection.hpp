@@ -504,7 +504,11 @@ namespace puffinn {
                                 hash_state.get());
                         break;
                     default:
-                        search_maps(query, maxbuffer, recall, hash_state.get());
+                        search_maps_simple_filter(
+                            query,
+                            maxbuffer,
+                            recall,
+                            hash_state.get());
                 }
             }
             g_performance_metrics.store_time(Computation::Search);
