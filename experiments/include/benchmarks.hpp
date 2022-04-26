@@ -119,7 +119,7 @@ void imp(ankerl::nanobench::Bench *bencher){
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
     auto dims = utils::load(data, "train", data_path, 500000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 1024*1024*1024);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 1024*1024*1024, true);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();  
     bencher->run("search with Simple", [&] {
@@ -147,7 +147,7 @@ void correctnessMeassurementPQ(){
     int n = 50000;
     int topK = 10;
     auto dims = utils::load(data, "train", data_path, n);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024, false);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();  
     for(int i = 0; i <n; i++){
@@ -170,7 +170,7 @@ void qualityAsProg(){
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
     auto dims = utils::load(data, "train", data_path, 100000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024, false);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();
     for(int i = 0; i < 500; i++){

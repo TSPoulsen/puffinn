@@ -162,12 +162,6 @@ namespace puffinn{
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
                 
-                //precompute pqCodes for all points in dataset
-                for(unsigned int i = 0; i < k; i++){
-                    for(unsigned int mem: kmeans.getGBMembers(i)){
-                        pqCodes[mem].push_back(i);
-                    }
-                }
 
                 // Convert back to UnitVectorFormat and store in codebook
                 codebook.push_back(Dataset<UnitVectorFormat>(subspaceSizes[m], dataset.get_size()));
@@ -180,6 +174,11 @@ namespace puffinn{
                 }
                 //Sizes of the padded subspaces r
                 subspaceSizesStored.push_back(codebook[m].get_description().storage_len);
+            }
+
+            //precompute pqCodes for all points in dataset
+            for(unsigned int idx = 0; idx < dataset.get_size(); idx++){
+                pqCodes[idx] = getPQCode(dataset[idx]);
             }
         }
 
