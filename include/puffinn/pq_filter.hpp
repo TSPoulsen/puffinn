@@ -151,13 +151,13 @@ namespace puffinn{
         void createCodebook(){
             unsigned int k = std::min(K, dataset.get_size());
             //used to keep track of where subspace begins
+            KMeans kmeans(k, MODE); 
             for(unsigned int m = 0; m < M ; m++)
             {
                 std::cout << "creating codebook for subspace " << m << std::endl;
                 //RunKmeans for the given subspace
                 //gb_labels for this subspace will be the mth index of the PQcodes
                 
-                KMeans kmeans(k, MODE); 
                 std::vector<std::vector<float>> subspace = getSubspace(m);
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();

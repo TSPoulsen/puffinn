@@ -470,31 +470,42 @@ namespace puffinn {
             g_performance_metrics.store_time(Computation::Hashing);
 
             g_performance_metrics.start_timer(Computation::Search);
-            switch (filter_type) {
-                case FilterType::None:
-                    search_maps_no_filter(
+
+            if (pq) {
+                if constexpr (std::is_same<CosineSimilarity, TSim>::value)
+                    search_maps_pq_simple_filter(
                         query,
                         maxbuffer,
                         recall,
                         hash_state.get());
-                    break;
-                case FilterType::Simple:
-                    search_maps_simple_filter(
-                        query,
-                        maxbuffer,
-                        recall,
-                        hash_state.get());
-                    break;
-                case FilterType::PQ_Simple:
-                    if constexpr (std::is_same<CosineSimilarity, TSim>::value)
-                        search_maps_pq_simple_filter(
+            }
+            else {
+                switch (filter_type) {
+                    case FilterType::None:
+                        search_maps_no_filter(
                             query,
                             maxbuffer,
                             recall,
                             hash_state.get());
-                    break;
-                default:
-                    search_maps(query, maxbuffer, recall, hash_state.get());
+                        break;
+                    case FilterType::Simple:
+                        search_maps_simple_filter(
+                            query,
+                            maxbuffer,
+                            recall,
+                            hash_state.get());
+                        break;
+                    case FilterType::PQ_Simple:
+                        if constexpr (std::is_same<CosineSimilarity, TSim>::value)
+                            search_maps_pq_simple_filter(
+                                query,
+                                maxbuffer,
+                                recall,
+                                hash_state.get());
+                        break;
+                    default:
+                        search_maps(query, maxbuffer, recall, hash_state.get());
+                }
             }
             g_performance_metrics.store_time(Computation::Search);
 

@@ -61,7 +61,7 @@ namespace puffinn
         /// @param max_iter The number of llyod iteration to at most perform before terminating (default: 100)
         /// @param tol The minimum inertia difference before the algorithm is terminated
         KMeans(unsigned int K_clusters = 256, distanceType mode = euclidean,
-            unsigned int runs = 3, unsigned int max_iter = 100, float tol = 0.001f)
+            unsigned int runs = 3, unsigned int max_iter = 100, float tol = 0.0f)
             : K(K_clusters),
             TOL(tol),
             MAX_ITER(max_iter),
