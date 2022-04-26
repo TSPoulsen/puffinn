@@ -35,6 +35,7 @@ namespace puffinn
         };
         enum distanceType {euclidean, mahalanobis, none};
         std::vector<float> covarianceMatrix; // Currently only public for testing purposes
+        std::vector<Cluster> gb_clusters;
     private:
 
         using dataType = std::vector<std::vector<float>>; // Type of the data which the kmeans works with
@@ -49,7 +50,6 @@ namespace puffinn
 
         // gb are the global best results
         // These will also be removed if N_RUNS is removed
-        std::vector<Cluster> gb_clusters;
 
     public:
         double gb_inertia = DBL_MAX;

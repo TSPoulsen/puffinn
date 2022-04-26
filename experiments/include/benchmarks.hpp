@@ -144,15 +144,15 @@ void correctnessMeassurementPQ(){
 
     std::vector<std::vector<float>> data;
     std::string data_path = "data/glove-25-angular.hdf5";
-    int n = 50000;
+    int n = 500000;
     int topK = 10;
     auto dims = utils::load(data, "train", data_path, n);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024, false);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024, true);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();  
     for(int i = 0; i <n; i++){
-        std::vector<uint32_t> guess = index.search(data[i], topK, 0.1, puffinn::FilterType::PQ_Simple);
-        std::vector<uint32_t> ans = index.search(data[i], topK, 0.1, puffinn::FilterType::None);
+        std::vector<uint32_t> guess = index.search(data[i], topK, 0.9, puffinn::FilterType::PQ_Simple);
+        std::vector<uint32_t> ans = index.search(data[i], topK, 0.9, puffinn::FilterType::None);
         
         std::sort(guess.begin(), guess.end());
         std::sort(ans.begin(), ans.end());

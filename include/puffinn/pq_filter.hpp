@@ -79,6 +79,7 @@ namespace puffinn{
             createCodebook();
             createDistanceTable();
             bootThreshold = bootStrapThreshold(100u, 5000u, 20u);
+            std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
             is_build = true;
         }
 
@@ -128,11 +129,15 @@ namespace puffinn{
     #endif
 
         //builds a dataset where each vector only contains the mth chunk
-        std::vector<std::vector<float>> getSubspace(unsigned int m) {
+        std::vector<std::vector<float>> getSubspace(unsigned int m, const bool sample = true) {
             // If dataset is large use at most 100.000 points for PQ
-            unsigned int N = std::min(dataset.get_size(), SAMPLE_SIZE);
+            unsigned int N = dataset.get_size();
+            if (sample)
+                N = std::min(N, SAMPLE_SIZE);
 
             std::vector<unsigned int> s_idcs = sample_idcs(N);
+            std::sort(s_idcs.begin(), s_idcs.end()); // Such that order is maintained when the sample is the whole dataset
+            //std::cout << "first sampel idx: " << s_idcs[0] << std::endl;
 
             std::vector<std::vector<float>> subspace(N, std::vector<float>(subspaceSizes[m]));
             unsigned int subspace_idx = 0;
@@ -148,7 +153,8 @@ namespace puffinn{
 
 
         //Runs kmeans for all m subspaces and stores the centroids in codebooks
-        void createCodebook(){
+        void createCodebook()
+        {
             unsigned int k = std::min(K, dataset.get_size());
             //used to keep track of where subspace begins
             KMeans kmeans(k, MODE); 
@@ -161,7 +167,20 @@ namespace puffinn{
                 std::vector<std::vector<float>> subspace = getSubspace(m);
                 kmeans.fit(subspace);
                 std::vector<std::vector<float>> centroids  = kmeans.getAllCentroids();
+                subspace = getSubspace(m,false);
+            #ifdef __AVX2__
+                kmeans.padData(subspace);
+            #endif
+                std::cout << "assign " << subspace.size() << std::endl;
+                kmeans.assignToClusters(subspace, kmeans.gb_clusters);
+                std::cout << "done assign" << std::endl;
                 
+                for (int ci = 0; ci < k; ci++ ) {
+                    std::vector<unsigned int> cm = kmeans.getGBMembers(ci);
+                    for (auto &m : cm) {
+                        pqCodes[m].push_back((uint8_t)ci);
+                    }
+                }
 
                 // Convert back to UnitVectorFormat and store in codebook
                 codebook.push_back(Dataset<UnitVectorFormat>(subspaceSizes[m], dataset.get_size()));
@@ -176,10 +195,6 @@ namespace puffinn{
                 subspaceSizesStored.push_back(codebook[m].get_description().storage_len);
             }
 
-            //precompute pqCodes for all points in dataset
-            for(unsigned int idx = 0; idx < dataset.get_size(); idx++){
-                pqCodes[idx] = getPQCode(dataset[idx]);
-            }
         }
 
 
@@ -189,7 +204,7 @@ namespace puffinn{
             std::vector<uint8_t> pqCode;
             for(unsigned int m = 0; m < M; m++){
                 float minDistance = FLT_MAX;
-                uint8_t quantization = 0;
+                uint8_t quantization = 0u;
                 for(int k = 0; k < K; k++){
                     float d = UnitVectorFormat::distance(vec+offsets[m], codebook[m][k], subspaceSizes[m]);
                     if(d < minDistance){
