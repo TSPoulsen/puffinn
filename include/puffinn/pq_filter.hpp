@@ -231,7 +231,8 @@ namespace puffinn{
         }
 
         int16_t estimatedInnerProduct(unsigned int xi) const {
-            int16_t sum = 0;
+            int16_t sum = 0xf59a; // About -0.08 in fixpoint16 format
+
             const uint8_t *p = &pqCodes[xi][0];
             for(unsigned int var = 0; var < LIM; var += 4*K, p+=4){
                 sum += queryDistances[var + *p];
