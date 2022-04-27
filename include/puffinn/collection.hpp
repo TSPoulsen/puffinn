@@ -289,6 +289,7 @@ namespace puffinn {
 
             unsigned int num_tables = 0;
             uint64_t table_mem = 0;
+            std::cout << "mem for tables" << std::endl;
             while (required_mem + table_mem < memory_limit) {
                 num_tables++;
                 table_mem = hash_args->memory_usage(desc, num_tables, MAX_HASHBITS)
@@ -304,6 +305,7 @@ namespace puffinn {
             }
 
             // if rebuild has been called before
+            std::cout << "some more table shit" << std::endl;
             if (hash_source) {
                 // Resize the number of tables
                 while (lsh_maps.size() > num_tables) {
@@ -327,6 +329,8 @@ namespace puffinn {
                 map.reserve(dataset.get_size());
             }
 
+            std::cout << "Computing hashes for vectors" << std::endl;
+
             // Compute hashes for the new vectors in order, so that caching works.
             // Hash a vector in all the different ways needed.
             for (size_t idx=last_rebuild; idx < dataset.get_size(); idx++) {
@@ -348,6 +352,7 @@ namespace puffinn {
                 lsh_maps[map_idx].rebuild();
             }
             last_rebuild = dataset.get_size();
+            //std::cout << "index done rebuild" << std::endl;
         }
 
         /// Search for the approximate ``k`` nearest neighbors to a query.
@@ -372,6 +377,7 @@ namespace puffinn {
             float recall,
             FilterType filter_type = FilterType::Default
         ) const {
+            //std::cout << "enter search" << std::endl;
             auto desc = dataset.get_description();
             auto stored_query = to_stored_type<typename TSim::Format>(query, desc);
             return search_formatted_query(stored_query.get(), k, recall, filter_type);
@@ -634,15 +640,20 @@ namespace puffinn {
             assert(pq);
             SearchBuffers buffers(lsh_maps, hash_state);
 
+            //std::cout << "precomputing" << std::endl;
             pq->precomp_query_to_centroids(query);
+            //std::cout << "precomputing done" << std::endl;
             int16_t limit = UnitVectorFormat::to_16bit_fixed_point(pq->bootThreshold);
+            //uint64_t c = 0u, p = 0u;
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);
                 for (uint_fast32_t range_idx=0; range_idx < buffers.num_ranges; range_idx++) {
                     auto range = buffers.ranges[range_idx];
                     while (range.first != range.second) {
                         auto idx = *range.first;
+                        //c++;
                         if (pq->estimatedInnerProduct(idx) > limit) {
+                            //p++;
                             auto dist = TSim::compute_similarity(
                                 query,
                                 dataset[idx],
@@ -672,9 +683,11 @@ namespace puffinn {
                     g_performance_metrics.set_hash_length(depth);
                     g_performance_metrics.set_considered_maps(
                         (MAX_HASHBITS-depth+1)*lsh_maps.size());
+                    //std::cout << "Estiamted inner prod for " << c << " points and " << p << " passed the filter" << std::endl;
                     return;
                 }
             }
+            //std::cout << "Estiamted inner prod for " << c << " points and " << p << " passed the filter" << std::endl;
         }
 
         // Search maps with a simple implementation of filtering.

@@ -80,7 +80,6 @@ namespace puffinn{
             createDistanceTable();
             bootThreshold = bootStrapThreshold(100u, 5000u, 20u);
             std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
-            is_build = true;
         }
 
         uint64_t memory_usage()
@@ -98,7 +97,7 @@ namespace puffinn{
         void createDistanceTable(){
             for(unsigned int m = 0; m < M; m++){
                 std::vector<std::vector<int16_t>> subspaceDists;
-                for(int k1 = 0; k1 < K; k1++){
+                for(unsigned int k1 = 0; k1 < K; k1++){
                     std::vector<int16_t> dists;
                     for(int k2 = 0; k2 < K; k2++){
                         dists.push_back(dot_product_i16_avx2(codebook[m][k1], codebook[m][k2], subspaceSizes[m]));
@@ -171,11 +170,9 @@ namespace puffinn{
             #ifdef __AVX2__
                 kmeans.padData(subspace);
             #endif
-                std::cout << "assign " << subspace.size() << std::endl;
                 kmeans.assignToClusters(subspace, kmeans.gb_clusters);
-                std::cout << "done assign" << std::endl;
                 
-                for (int ci = 0; ci < k; ci++ ) {
+                for (unsigned int ci = 0; ci < k; ci++ ) {
                     std::vector<unsigned int> cm = kmeans.getGBMembers(ci);
                     for (auto &m : cm) {
                         pqCodes[m].push_back((uint8_t)ci);
@@ -194,6 +191,7 @@ namespace puffinn{
                 //Sizes of the padded subspaces r
                 subspaceSizesStored.push_back(codebook[m].get_description().storage_len);
             }
+            is_build = true;
 
         }
 
@@ -430,9 +428,16 @@ namespace puffinn{
                     int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
                     maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));
                 }
-                sumOfThresholds += maxbuffer.smallest_value();
+                auto best = maxbuffer.best_indices();
+                precomp_query_to_centroids(dataset[bootQuery]);
+                int16_t min_est = UnitVectorFormat::to_16bit_fixed_point(1.0f); // maximum value of fixpoint16
+                //std::cout << "init min_est" << UnitVectorFormat::from_16bit_fixed_point(min_est) << std::endl;
+                for (auto &idx : best) {
+                    min_est = std::min(min_est, estimatedInnerProduct(idx));
             }
-            return sumOfThresholds/nruns;            
+                sumOfThresholds += UnitVectorFormat::from_16bit_fixed_point(min_est);
+            }
+            return sumOfThresholds/(nruns);            
         }
 
         //Functions below are just debugging tools and old code that might be useful down the road
