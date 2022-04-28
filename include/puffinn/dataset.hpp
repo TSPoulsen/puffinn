@@ -7,6 +7,7 @@
 #include <vector>
 #include <istream>
 #include <memory>
+#include <algorithm>
 #include <ostream>
 
 namespace puffinn {
