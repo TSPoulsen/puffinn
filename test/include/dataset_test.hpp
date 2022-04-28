@@ -15,6 +15,7 @@ namespace dataset {
         const unsigned int CAPACITY = 1000;
 
         Dataset<UnitVectorFormat> dataset(DIMENSIONS, CAPACITY);
+        dataset.dont_permute();
         REQUIRE(dataset.get_description().args == 3);
         REQUIRE(dataset.get_description().storage_len == 16);
         REQUIRE(dataset.get_size() == 0);
@@ -35,6 +36,7 @@ namespace dataset {
         const unsigned int SIZE = 10000;
 
         Dataset<UnitVectorFormat> dataset(DIMENSIONS);
+        dataset.dont_permute();
 
         std::vector<float> vec(DIMENSIONS, 0);
         vec[1] = 1.0;

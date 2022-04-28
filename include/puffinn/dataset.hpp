@@ -2,13 +2,38 @@
 
 #include "puffinn/format/generic.hpp"
 #include "puffinn/typedefs.hpp"
-
 #include <cstring>
+#include <assert.h>
+#include <vector>
 #include <istream>
 #include <memory>
 #include <ostream>
 
 namespace puffinn {
+
+    // Fisher–Yates_shuffle
+    // If sample_size == data_size, it returns a random permutation of indicies
+    std::vector<unsigned int> random_sample(unsigned int sample_size, unsigned int data_size)
+    {
+        auto &gen = get_default_random_generator();
+        assert(sample_size <= data_size);
+        std::vector<unsigned int> res(sample_size);
+        for (unsigned int i = 0; i != data_size; ++i) {
+            std::uniform_int_distribution<unsigned int> dis(0, i);
+            std::size_t j = dis(gen);
+            if (j < res.size()) {
+                if (i < res.size()) {
+                    res[i] = res[j];
+                }
+                res[j] = i;
+            }
+        }
+        for (unsigned int idx : res) {
+            assert(idx < data_size);
+        }
+        return res;
+    }
+
     const unsigned int DEFAULT_CAPACITY = 100;
     const float EXPANSION_FACTOR = 1.5;
 
@@ -27,6 +52,8 @@ namespace puffinn {
         unsigned int capacity;
         // Inserted vectors, aligned to the vector alignment.
         AlignedStorage<T> data;
+        // Permutation of vectors before alignment
+        std::vector<unsigned int> permutation;
 
     public:
         // Create an empty storage for vectors with the given number of dimensions.
@@ -41,7 +68,8 @@ namespace puffinn {
             storage_len(pad_dimensions<T>(T::storage_dimensions(args))),
             inserted_vectors(0),
             capacity(capacity),
-            data(allocate_storage<T>(capacity, storage_len))
+            data(allocate_storage<T>(capacity, storage_len)),
+            permutation(random_sample(args, args))
         {
         }
 
@@ -50,6 +78,7 @@ namespace puffinn {
             storage_len(other.storage_len),
             inserted_vectors(other.inserted_vectors),
             capacity(other.capacity),
+            permutation(other.permutation),
             data(std::move(other.data))
         {
         }
@@ -60,6 +89,7 @@ namespace puffinn {
                 storage_len = rhs.storage_len;
                 inserted_vectors = rhs.inserted_vectors;
                 capacity = rhs.capacity;
+                permutation = rhs.permutation;
                 data = std::move(rhs.data);
             }
             return *this;
@@ -71,6 +101,7 @@ namespace puffinn {
                 storage_len = rhs.storage_len;
                 inserted_vectors = rhs.inserted_vectors;
                 capacity = rhs.capacity;
+                permutation = rhs.permutation;
                 data = std::move(rhs.data);
             }
             return *this;
@@ -95,6 +126,10 @@ namespace puffinn {
                 T::serialize_type(out, data.get()[i]);
             }
         }
+        // creates the normal ordering for dimensions
+        void dont_permute() {
+            std::sort(permutation.begin(), permutation.end()); 
+        }
 
         // Access the vector at the given position.
         typename T::Type* operator[](unsigned int idx) const {
@@ -107,6 +142,7 @@ namespace puffinn {
             DatasetDescription<T> res;
             res.args = args;
             res.storage_len = storage_len;
+            res.permutation = permutation;
             return res;
         }
 

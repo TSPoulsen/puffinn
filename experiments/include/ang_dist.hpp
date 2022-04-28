@@ -26,7 +26,7 @@ void ang_dist_glove_subset()
     Dataset<UnitVectorFormat> test(0,0);
     std::pair<int,int> train_dim = utils::load<UnitVectorFormat>(train, "train", DATA_PATH, 100000);
     std::pair<int,int> test_dim = utils::load<UnitVectorFormat>(test, "test", DATA_PATH, 100);
-    H5::H5File *file = new H5::H5File("experiments/results/test.hdf5", H5F_ACC_TRUNC);
+    H5::H5File *file = new H5::H5File("experiments/results/g25_angd.hdf5", H5F_ACC_TRUNC);
 
     hsize_t dims[2] = {test_dim.first, train_dim.first};
     H5::DataSpace space(2, dims);
@@ -41,7 +41,7 @@ void ang_dist_glove_subset()
             result_arr[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(test[j], train[i], train.get_description().storage_len));
         }
     }
-    H5::DataSet *true_inner_data = new H5::DataSet(file->createDataSet("True_innner_product", H5::PredType::NATIVE_FLOAT, space));
+    H5::DataSet *true_inner_data = new H5::DataSet(file->createDataSet("True_inner_product", H5::PredType::NATIVE_FLOAT, space));
     true_inner_data->write(result_arr, H5::PredType::NATIVE_FLOAT);
 
     // Calculating & writing results

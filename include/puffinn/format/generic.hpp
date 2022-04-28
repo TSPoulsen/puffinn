@@ -11,6 +11,7 @@ namespace puffinn {
     struct DatasetDescription {
         typename T::Args args;
         unsigned int storage_len;
+        std::vector<unsigned int> permutation;
 
         DatasetDescription() = default;
         DatasetDescription(std::istream& in) {

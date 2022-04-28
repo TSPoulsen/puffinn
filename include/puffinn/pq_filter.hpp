@@ -4,8 +4,10 @@
 #include "puffinn/kmeans.hpp"
 #include "math.h"
 #include <vector>
+#include <assert.h>
 #include <cfloat>
 #include <iostream>
+#include <inttypes.h>
 
 
 namespace puffinn{
@@ -134,7 +136,7 @@ namespace puffinn{
             if (sample)
                 N = std::min(N, SAMPLE_SIZE);
 
-            std::vector<unsigned int> s_idcs = sample_idcs(N);
+            std::vector<unsigned int> s_idcs = random_sample(N, dataset.get_size());
             std::sort(s_idcs.begin(), s_idcs.end()); // Such that order is maintained when the sample is the whole dataset
             //std::cout << "first sampel idx: " << s_idcs[0] << std::endl;
 
@@ -231,7 +233,7 @@ namespace puffinn{
         }
 
         int16_t estimatedInnerProduct(unsigned int xi) const {
-            int16_t sum = 0xf59a; // About -0.08 in fixpoint16 format
+            int16_t sum = 0xf99a; // About -0.05 in fixpoint16 format
 
             const uint8_t *p = &pqCodes[xi][0];
             for(unsigned int var = 0; var < LIM; var += 4*K, p+=4){
@@ -395,36 +397,13 @@ namespace puffinn{
             return sum;
         }
 
-        // Fisher–Yates_shuffle
-        std::vector<unsigned int> sample_idcs(unsigned int size)
-        {
-            auto &gen = get_default_random_generator();
-            unsigned int N = dataset.get_size();
-            assert(size <= N);
-            std::vector<unsigned int> res(size);
-            for (unsigned int i = 0; i != N; ++i) {
-                std::uniform_int_distribution<unsigned int> dis(0, i);
-                std::size_t j = dis(gen);
-                if (j < res.size()) {
-                    if (i < res.size()) {
-                        res[i] = res[j];
-                    }
-                    res[j] = i;
-                }
-            }
-            for (unsigned int idx : res) {
-                assert(idx < N);
-            }
-            return res;
-        }
-
         float bootStrapThreshold(unsigned int nruns = 150, unsigned int sizeOfRun = 5000, unsigned int topK = 25){
-            std::vector<unsigned int> q_idcs = sample_idcs(std::min(nruns,dataset.get_size()));
+            std::vector<unsigned int> q_idcs = random_sample(std::min(nruns,dataset.get_size()), dataset.get_size());
             float sumOfThresholds = 0.0;
             for (unsigned int bootQuery : q_idcs)
             {
                 MaxBuffer maxbuffer(topK);
-                std::vector<unsigned int> d_idcs = sample_idcs(std::min(sizeOfRun, dataset.get_size()));
+                std::vector<unsigned int> d_idcs = random_sample(std::min(sizeOfRun, dataset.get_size()), dataset.get_size());
                 for (unsigned int idx : d_idcs) {
                     int16_t distance = dot_product_i16(dataset[bootQuery], dataset[idx], dataset.get_description().storage_len);
                     maxbuffer.insert(idx, UnitVectorFormat::from_16bit_fixed_point(distance));

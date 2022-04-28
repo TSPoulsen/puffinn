@@ -2,6 +2,7 @@
 
 #include <cassert>
 #include <cmath>
+#include <iostream>
 #include <istream>
 #include <ostream>
 #include <random>
@@ -82,8 +83,10 @@ namespace puffinn {
                 }
             }
 
+            // Permutation of dimensions
+            std::vector<unsigned int> &permutation = dataset.permutation;
             for (size_t i=0; i < copy.size(); i++) {
-                storage[i] = to_16bit_fixed_point(copy[i]);
+                storage[i] = to_16bit_fixed_point(copy[permutation[i]]);
             }
             for (size_t i=copy.size(); i < dataset.storage_len; i++) {
                 storage[i] = to_16bit_fixed_point(0.0);

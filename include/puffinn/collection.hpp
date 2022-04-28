@@ -243,6 +243,9 @@ namespace puffinn {
             return SerializeIter(*this, lsh_maps.size());
         }
 
+        void dont_permute() {
+            dataset.dont_permute();
+        }
         /// Insert a value into the index.
         ///
         /// Before the value can be found using the ``search`` method,
