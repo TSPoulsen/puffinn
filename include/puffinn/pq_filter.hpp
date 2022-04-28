@@ -23,7 +23,7 @@ namespace puffinn{
         //precomputed inter-centroid distances for faster symmetric distance computation
         std::vector<std::vector<std::vector<int16_t>>> centroidDistances;
         //pointer to float array of M x K (flattened to 1d array)
-        int16_t *queryDistances;
+        float *queryDistances;
         std::vector<std::vector<uint8_t>> pqCodes;
         Dataset<UnitVectorFormat> &dataset;
         //meta information about the subspaces to avoid recomputation 
@@ -58,7 +58,7 @@ namespace puffinn{
             for(auto i = subspaceSizes.begin(); i != subspaceSizes.begin()+leftover; i++) (*i)++;
             auto p = subspaceSizes.begin();
             for(unsigned int i = 1; i < M; i++) offsets.push_back(offsets.back()+ *p++);
-            queryDistances = new int16_t[K*M];
+            queryDistances = new float[K*M];
             LIM = K*M;
         }
 
@@ -72,7 +72,7 @@ namespace puffinn{
         {
             if (dataset.get_size() == 0){
                 is_build = false;
-                std::fill_n(queryDistances, K*M, 0);
+                std::fill_n(queryDistances, K*M, 0.0f);
                 return;
             } 
 
@@ -80,7 +80,7 @@ namespace puffinn{
             pqCodes.resize(dataset.get_size());
             createCodebook();
             createDistanceTable();
-            bootThreshold = bootStrapThreshold(100u, 5000u, 15u);
+            bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
             std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
         }
 
@@ -222,18 +222,18 @@ namespace puffinn{
             alignas(32) int16_t paddedY[getPadSize()];
             createPaddedQueryPoint(y, paddedY);
             int16_t *a_p = &paddedY[0];
-            int16_t * p = queryDistances;
+            float * p = queryDistances;
             const unsigned int *size_p = &subspaceSizesStored[0];
             for(unsigned int m = 0; m < M; m++){
                 for(unsigned int k = 0; k < K; k++){
-                    *p++ = dot_product_i16_avx2(codebook[m][k], a_p, *size_p);
+                    *p++ = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16_avx2(codebook[m][k], a_p, *size_p));
                 }
                 a_p += *size_p++;
             }
         }
 
-        int16_t estimatedInnerProduct(unsigned int xi) const {
-            int16_t sum = 0xf99a; // About -0.05 in fixpoint16 format
+        float estimatedInnerProduct(unsigned int xi) const {
+            float sum = 0.0f; // About -0.05 in fixpoint16 format
 
             const uint8_t *p = &pqCodes[xi][0];
             for(unsigned int var = 0; var < LIM; var += 4*K, p+=4){
@@ -410,12 +410,12 @@ namespace puffinn{
                 }
                 auto best = maxbuffer.best_indices();
                 precomp_query_to_centroids(dataset[bootQuery]);
-                int16_t min_est = UnitVectorFormat::to_16bit_fixed_point(1.0f); // maximum value of fixpoint16
+                float min_est = 1.0f; // maximum value of inner product
                 //std::cout << "init min_est" << UnitVectorFormat::from_16bit_fixed_point(min_est) << std::endl;
                 for (auto &idx : best) {
                     min_est = std::min(min_est, estimatedInnerProduct(idx));
             }
-                sumOfThresholds += UnitVectorFormat::from_16bit_fixed_point(min_est);
+                sumOfThresholds += min_est;
             }
             return sumOfThresholds/(nruns);            
         }

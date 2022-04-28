@@ -646,7 +646,7 @@ namespace puffinn {
             //std::cout << "precomputing" << std::endl;
             pq->precomp_query_to_centroids(query);
             //std::cout << "precomputing done" << std::endl;
-            int16_t limit = UnitVectorFormat::to_16bit_fixed_point(pq->bootThreshold);
+            float limit = pq->bootThreshold;
             //uint64_t c = 0u, p = 0u;
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);

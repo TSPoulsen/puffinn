@@ -56,7 +56,7 @@ void ang_dist_glove_subset()
         for (int j = 0; j < test_dim.first; j++) {
             filter.precomp_query_to_centroids(test[j]);
             for (int i = 0; i < train_dim.first; i++) {
-                result_arr[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(filter.estimatedInnerProduct(i));
+                result_arr[j*train_dim.first + i] = filter.estimatedInnerProduct(i);
             }
         }
         H5::DataSet *asym_data = new H5::DataSet(grp->createDataSet("Asymmetric_distance", H5::PredType::NATIVE_FLOAT, space));
