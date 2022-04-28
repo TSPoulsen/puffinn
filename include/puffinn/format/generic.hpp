@@ -3,6 +3,7 @@
 #include <istream>
 #include <memory>
 #include <ostream>
+#include <vector>
 
 namespace puffinn {
     // Both the dimensionality of the input vectors and the
