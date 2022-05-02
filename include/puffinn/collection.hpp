@@ -666,7 +666,7 @@ namespace puffinn {
                         }
                         range.first++;
                     }
-                    auto kth_similarity = maxbuffer.smallest_value();
+                    //auto kth_similarity = maxbuffer.smallest_value();
                     //limit = UnitVectorFormat::to_16bit_fixed_point((kth_similarity*2)-1.0);
 
                 }

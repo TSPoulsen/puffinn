@@ -3,6 +3,7 @@
 #include <vector>
 #include <iostream>
 #include <valarray>
+#include <cassert>
 #include <climits>
 #include <H5Cpp.h>
 #include <string>
@@ -52,34 +53,46 @@ namespace utils {
         dataspace.getSimpleExtentDims(data_dims, NULL);
         int n = data_dims[0], dim = data_dims[1];
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
+        dataset.dont_permute();
         std::valarray<float> temp(n * dim);
-        dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
         if (n > max_size) n = max_size;
         for (int i = 0; i < n; i++ ) {
             std::vector<float> vec(&temp[i*dim], &temp[(i+1)*dim]);
             dataset.insert(vec);
         }
-        //std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
+        std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
         return std::make_pair(n, dim);;
     }
 
     // Load dataset into vector of vectors but have it normalized by loading it into a Dataset<UnitVectorFormat> first
     std::pair<int, int> load(std::vector<std::vector<float>> &data, std::string set, std::string path = DEFAULT_HDF5_FILE, int max_size = INT_MAX)
     {
-        puffinn::Dataset<puffinn::UnitVectorFormat> p_data(0, 0);
-        auto dims = load<puffinn::UnitVectorFormat>(p_data, set, path, max_size);
+        assert(data.size() == 0u);
+        // Open the file and get the dataset
+        //std::cerr << "LOADING FILE" << std::endl;
+        H5::H5File file(path, H5F_ACC_RDONLY);
+        H5::Group group = file.openGroup("/");
+        H5::DataSet h5_dataset = group.openDataSet(set);
 
-        data.clear();
-        data.resize(dims.first);
-        for(unsigned int i = 0; i < dims.first; i++) {
-            data[i].resize(dims.second);
-            for (unsigned int d = 0; d < dims.second; d++) {
-                data[i][d] = puffinn::UnitVectorFormat::from_16bit_fixed_point(*(p_data[i] + d));
-            }
+        H5T_class_t type_class = h5_dataset.getTypeClass();
+        // Check that we have a dataset of floats
+        if (type_class != H5T_FLOAT) { throw std::runtime_error("wrong type class"); }
+        H5::DataSpace dataspace = h5_dataset.getSpace();
+
+        // Get the number of vectors and the dimensionality
+        hsize_t data_dims[2];
+        dataspace.getSimpleExtentDims(data_dims, NULL);
+        int n = data_dims[0], dim = data_dims[1];
+        std::valarray<float> temp(n * dim);
+        h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
+        if (n > max_size) n = max_size;
+        for (int i = 0; i < n; i++ ) {
+            std::vector<float> vec(&temp[i*dim], &temp[(i+1)*dim]);
+            data.push_back(vec);
         }
-        //std::cout << "DONE LOADING IN VECTOR" << std::endl;
-        return dims;
+        std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
+        return std::make_pair(n, dim);;
     }
 
 }

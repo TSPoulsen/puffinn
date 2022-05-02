@@ -96,7 +96,7 @@ namespace puffinn
                 // When dataset is large enough there is no need to run multiple times
                 // Instead we increase iterations
                 to_run = 1; 
-                max_iter = std::max(max_iter, 150u);
+                max_iter = std::max(max_iter, 100u);
             } 
 
             for(unsigned int run=0; run < to_run; run++) {
@@ -138,7 +138,7 @@ namespace puffinn
             double inertia = DBL_MAX;
             unsigned int iteration = 0;
 
-            std::cout << "Kmeans total iterations " << max_iter << " : ";
+            //std::cout << "Kmeans total iterations " << max_iter << " : ";
             while (inertia_delta > TOL && iteration < max_iter )
             {
                 if (iteration%10 == 0) std::cout << iteration << "-" << std::flush;
