@@ -147,9 +147,9 @@ namespace puffinn {
             uint64_t memory_limit,
             const bool use_pq = true,
             const HashSourceArgs<THash>& hash_args = IndependentHashArgs<THash>(),
-            const unsigned int M = 8,
+            const unsigned int M = 16,
             const unsigned int K = 256,
-            const KMeans::distanceType mode = KMeans::euclidean,
+            const KMeans::distanceType mode = KMeans::mahalanobis,
             const HashSourceArgs<TSketch>& sketch_args = IndependentHashArgs<TSketch>()
         )
           : dataset(Dataset<typename TSim::Format>(dataset_args)),
@@ -646,7 +646,7 @@ namespace puffinn {
             //std::cout << "precomputing" << std::endl;
             pq->precomp_query_to_centroids(query);
             //std::cout << "precomputing done" << std::endl;
-            float limit = pq->bootThreshold;
+            float limit = 0.3f;
             //uint64_t c = 0u, p = 0u;
             for (uint_fast8_t depth=MAX_HASHBITS; depth > 0; depth--) {
                 buffers.fill_ranges(lsh_maps);
@@ -666,8 +666,10 @@ namespace puffinn {
                         }
                         range.first++;
                     }
-                    //auto kth_similarity = maxbuffer.smallest_value();
-                    //limit = UnitVectorFormat::to_16bit_fixed_point((kth_similarity*2)-1.0);
+                    auto kth_similarity = maxbuffer.smallest_value() * 2 -1;
+                    if(kth_similarity > 0.3f) limit = kth_similarity * 0.777;
+                    //limit = kth_similarity * 0.777;
+                    //std::cout << "new limit is: "<< limit << std::endl;  
 
                 }
                 g_performance_metrics.store_time(Computation::Consider);
