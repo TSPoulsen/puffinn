@@ -667,7 +667,8 @@ namespace puffinn {
                         range.first++;
                     }
                     auto kth_similarity = maxbuffer.smallest_value();
-                    //limit = UnitVectorFormat::to_16bit_fixed_point((kth_similarity*2)-1.0);
+                    kth_similarity = kth_similarity*2 -1;
+                    if(kth_similarity > 0.3f) limit = kth_similarity ;
 
                 }
                 g_performance_metrics.store_time(Computation::Consider);

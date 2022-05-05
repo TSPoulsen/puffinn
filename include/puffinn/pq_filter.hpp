@@ -24,6 +24,7 @@ namespace puffinn{
         std::vector<std::vector<std::vector<int16_t>>> centroidDistances;
         //pointer to float array of M x K (flattened to 1d array)
         float *queryDistances;
+        float quantization_error;
         std::vector<std::vector<uint8_t>> pqCodes;
         Dataset<UnitVectorFormat> &dataset;
         //meta information about the subspaces to avoid recomputation 
@@ -157,6 +158,7 @@ namespace puffinn{
         void createCodebook()
         {
             unsigned int k = std::min(K, dataset.get_size());
+            quantization_error = 0.0f;
             //used to keep track of where subspace begins
             KMeans kmeans(k, MODE); 
             for(unsigned int m = 0; m < M ; m++)
@@ -172,8 +174,8 @@ namespace puffinn{
             #ifdef __AVX2__
                 kmeans.padData(subspace);
             #endif
-                kmeans.assignToClusters(subspace, kmeans.gb_clusters);
-                
+                quantization_error += kmeans.assignToClusters(subspace, kmeans.gb_clusters);
+
                 for (unsigned int ci = 0; ci < k; ci++ ) {
                     std::vector<unsigned int> cm = kmeans.getGBMembers(ci);
                     for (auto &m : cm) {
@@ -193,11 +195,14 @@ namespace puffinn{
                 //Sizes of the padded subspaces r
                 subspaceSizesStored.push_back(codebook[m].get_description().storage_len);
             }
+            quantization_error = quantization_error/dataset.get_size();
             is_build = true;
 
         }
 
-
+        float getQuantizationError(){
+            return quantization_error;
+        }
 
         //Naive way of getting PQCode will be usefull if we decide to use samples to construct centroids
         std::vector<uint8_t> getPQCode(typename UnitVectorFormat::Type* vec) const {
