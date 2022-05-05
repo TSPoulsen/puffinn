@@ -30,13 +30,18 @@ def calcPrecRecallLSH(diffs: np.array, true_neigh) -> Tuple[np.array, np.array]:
         print(i, end="-", flush = True)
         row_order = order[i]
         idcs = np.searchsorted(row, int_range, sorter = row_order)
+        top_k = set(true_neigh[i])
+        last = 0
         for j, p_i in enumerate(idcs):
-            passed = row_order[p_i:] 
-            tp = np.intersect1d(passed,true_neigh[i]).shape[0]
+            passed = row_order[last:p_i] 
+            for idx in passed:
+                top_k.discard(idx)
+            tp = len(top_k)
             fp = true_neigh.shape[1] - tp 
-            fn = passed.shape[0] - tp
+            fn = p_i - tp
             recalls[j] += ((tp+0.01)/((tp+fn)+0.01))
             precisions[j] += ((tp+0.01)/((tp + fp)+0.01))
+            last = p_i
     print()
     recalls /= order.shape[0]
     precisions /= order.shape[0]
@@ -44,24 +49,34 @@ def calcPrecRecallLSH(diffs: np.array, true_neigh) -> Tuple[np.array, np.array]:
 
 
 def calcPrecRecallPQ(estimates: np.array, true_neigh: np.array) -> Tuple[np.array, np.array]:
-    recalls = np.zeros(RAN.shape[0]) 
-    precisions = np.zeros(RAN.shape[0]) 
+    recalls = np.zeros((estimates.shape[0], RAN.shape[0]))
+    precisions = np.zeros((estimates.shape[0], RAN.shape[0]))
+    percent_passed = np.zeros((estimates.shape[0], RAN.shape[0]))
     order = np.argsort(estimates)
+    print(estimates.shape)
+    print(true_neigh.shape)
     for i, row in enumerate(estimates):
         print(i,end ="-", flush=True)
         row_order = order[i]
         idcs = np.searchsorted(row, RAN, sorter = row_order)
+        top_k = set(true_neigh[i])
+        last = 0
         for j, p_i in enumerate(idcs):
-            passed = row_order[p_i:] 
-            tp = np.intersect1d(passed,true_neigh[i]).shape[0]
+            passed = row_order[last:p_i] 
+            for idx in passed:
+                top_k.discard(idx)
+            tp = len(top_k)
             fp = true_neigh.shape[1] - tp 
-            fn = passed.shape[0] - tp
-            recalls[j] += ((tp+0.01)/((tp+fn)+0.01))
-            precisions[j] += ((tp+0.01)/((tp + fp)+0.01))
+            r = (tp+0.01)/((order.shape[1]-p_i)+0.01)
+            p = (tp+0.01)/(true_neigh.shape[1]+0.01)
+            recalls[i, j] = r
+            precisions[i, j] = p
+            percent_passed[i,j] = (order.shape[1] - p_i)/order.shape[1]
+            last = p_i
     print()
-    recalls /= order.shape[0]
-    precisions /= order.shape[0]
-    return recalls, precisions
+    #recalls /= order.shape[0]
+    #precisions /= order.shape[0]
+    return recalls, precisions, percent_passed
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
@@ -79,18 +94,19 @@ if __name__ == "__main__":
     rf = h5py.File("rec_prec_results.hdf5","r+")
     data = h5py.File("../../data/glove-100-angular.hdf5","r")
     true_neigh = np.array(data["neighbors"])
-    true_neigh[:,:args.k] # They are given in sorted order
+    true_neigh = true_neigh[:,:args.k] # They are given in sorted order
     for fn in filenames.keys():
         print(fn)
         if (filenames[fn] in rf.keys() and str(args.k) in rf[filenames[fn]]) and not args.force:  continue
         hf = h5py.File(fn, "r")
-        rec, prec = calcPrecRecallPQ(np.array(hf["estimated_inner"]), true_neigh)
+        rec, prec, p_passed = calcPrecRecallPQ(np.array(hf["estimated_inner"]), true_neigh)
         g = rf.get(filenames[fn],None)
         if not g: g = rf.create_group(filenames[fn])
         if g.get(str(args.k), ""): del g[str(args.k)]
         gk = g.create_group(str(args.k))
         gk.create_dataset("recalls", data = rec)
         gk.create_dataset("precisions", data = prec)
+        gk.create_dataset("percent_passed", data = p_passed)
         hf.close()
 
     #hf = h5py.File("g100_pass_filter_lsh.hdf5", "r")

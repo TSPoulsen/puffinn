@@ -79,7 +79,6 @@ namespace puffinn
         // Runs N_RUNS times and then chooses the best of those runs
         void fit(dataType &data)
         {
-            std::cout << "Kmeans.fit called" << std::endl;
             assert(K <= data.size());
 
         #if __AVX2__
@@ -123,7 +122,7 @@ namespace puffinn
 
         std::vector<float> getCentroid(size_t c_i) {
             // Removes padding from centroid
-            return std::vector<float>(&*gb_clusters[c_i].centroid.begin(), &*gb_clusters[c_i].centroid.end()-padding);
+            return std::vector<float>(&*gb_clusters[c_i].centroid.begin(), (&*gb_clusters[c_i].centroid.end())-padding);
         }
 
 
@@ -429,8 +428,7 @@ namespace puffinn
 
         // Adds padding such that each vector is a multiple of 8
         void padData(dataType &data) {
-            padding = 8 - (data[0].size() % 8);
-            if (padding == 8) return; // Already correct size
+            padding = (8 - (data[0].size() % 8))%8;
             for (std::vector<float> &vec : data) {
                 for (unsigned int p = 0; p < padding; p++) {
                     vec.push_back(0);

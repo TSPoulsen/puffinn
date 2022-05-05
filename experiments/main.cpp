@@ -11,13 +11,14 @@
 #include "benchmarks.hpp"
 using namespace puffinn;
 
-int main() {
+int main(int argc, char *argv[]) {
     //ang_dist_glove_subset();
     //pq_passing_filter();
     // time_kmeans();
     // l2_quant_error();
     // all_bench();
     //lsh_passing_filter();
-    inertia_run();
+    run_pass_filter(argc, argv);
+    // inertia_run();
     //inertia_variance();
 }

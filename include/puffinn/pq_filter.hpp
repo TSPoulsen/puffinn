@@ -79,8 +79,8 @@ namespace puffinn{
             std::cout << "rebuilding pq_filter" << std::endl;
             pqCodes.resize(dataset.get_size());
             createCodebook();
-            createDistanceTable();
-            bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
+            // createDistanceTable();
+            // bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
             std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
         }
 
@@ -330,7 +330,7 @@ namespace puffinn{
                 for(unsigned int i = 0; i < subspaceSizes[m]; i++){
                     *a++ = *y++;
                 }
-                unsigned int padd = 16 - (subspaceSizes[m] % 16);
+                unsigned int padd = (16 - (subspaceSizes[m] % 16))%16;
                 a = std::fill_n(a, padd, 0);
             }
         }  
