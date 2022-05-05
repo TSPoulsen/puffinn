@@ -20,7 +20,6 @@ namespace collection {
 
     TEST_CASE("get unit vector") {
         Index<CosineSimilarity> index(2, 1*MB, false);
-        index.dont_permute();
         index.insert(std::vector<float>({1, 0}));
         index.insert(std::vector<float>({0, 1}));
         REQUIRE(index.get<std::vector<float>>(1)[0] == 0.0);

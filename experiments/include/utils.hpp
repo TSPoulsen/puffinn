@@ -53,7 +53,6 @@ namespace utils {
         dataspace.getSimpleExtentDims(data_dims, NULL);
         int n = data_dims[0], dim = data_dims[1];
         dataset = puffinn::Dataset<puffinn::UnitVectorFormat>(dim, n);
-        dataset.dont_permute();
         std::valarray<float> temp(n * dim);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
         if (n > max_size) n = max_size;
