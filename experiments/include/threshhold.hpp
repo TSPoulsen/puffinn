@@ -39,7 +39,8 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     std::vector<std::vector<float>> train_v;
     std::pair<int,int> train_dim = utils::load(train_v, "train", data_path, 5000000);
     Dataset<UnitVectorFormat> train(train_dim.second,train_dim.first);
-    train.dont_permute();
+    if (perm)
+        train.permute();
     for (auto &v : train_v) {
         train.insert(v);
     }
@@ -113,25 +114,19 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
 }
 
 
-void lsh_passing_filter(std::string data_path = DEFAULT_DATA, const bool total = true)
+void lsh_passing_filter(std::string data_path = DEFAULT_DATA, const int n_sketches = 1)
 {
     std::cout << "START LSH FILTER PASSING" << std::endl << std::endl;
-    unsigned int n_sketches = 1;
-    if (total) n_sketches = NUM_SKETCHES;
-
 
     std::stringstream ss;
     int start = data_path.find("/") + 1,
         end   = data_path.find(".");
-    ss << "experiments/results/" << data_path.substr(start, end - start) << "_lsh";
-    if (total) ss << "_total.hdf5";
-    else ss << "_single.hdf5";
+    ss << "experiments/results/" << data_path.substr(start, end - start) << "_lsh_" << std::to_string(n_sketches) << ".hdf5" ;
     std::cout << ss.str() << std::endl;
     H5::H5File *file = new H5::H5File(ss.str(), H5F_ACC_TRUNC);
     std::vector<std::vector<float>> train_v;
     std::pair<int,int> train_dim = utils::load(train_v, "train", data_path, 5000000);
     Dataset<UnitVectorFormat> train(train_dim.second,train_dim.first);
-    train.dont_permute(); // Shouldn't make a difference here
     for (auto &v : train_v) {
         train.insert(v);
     }
@@ -181,8 +176,8 @@ void run_pass_filter(int argc, char *argv[])
     }
     else if (argc == 3) {
         const std::string data_path = argv[1];
-        const bool total = std::string(argv[2]) == "total";
-        lsh_passing_filter(data_path, total);
+        const bool n_sketches = atoi(argv[2]);
+        lsh_passing_filter(data_path, n_sketches);
     }
 
 }

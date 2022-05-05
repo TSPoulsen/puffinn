@@ -69,8 +69,7 @@ namespace puffinn {
             storage_len(pad_dimensions<T>(T::storage_dimensions(args))),
             inserted_vectors(0),
             capacity(capacity),
-            data(allocate_storage<T>(capacity, storage_len)),
-            permutation(random_sample(args, args))
+            data(allocate_storage<T>(capacity, storage_len))
         {
         }
 
@@ -128,8 +127,9 @@ namespace puffinn {
             }
         }
         // creates the normal ordering for dimensions
-        void dont_permute() {
-            std::sort(permutation.begin(), permutation.end()); 
+        void permute() {
+            if (permutation.size() == 0)
+                permutation = random_sample(args, args);
         }
 
         // Access the vector at the given position.

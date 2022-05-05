@@ -16,7 +16,7 @@ void inertia_run()
     H5::H5File *file = new H5::H5File("experiments/results/inertia_runs.hdf5", H5F_ACC_TRUNC);
 
     Dataset<UnitVectorFormat> train(train_dim.second,train_dim.first);
-    train.dont_permute(); // Uncomment this to remove random permutations of dimensions
+    //train.permute(); // Uncomment this to remove random permutations of dimensions
     for (auto &v : train_v) {
         train.insert(v);
     }
@@ -61,7 +61,7 @@ void inertia_variance()
     std::pair<int,int> train_dim = utils::load(train_v, "train", DATA_PATH);
 
     Dataset<UnitVectorFormat> train(train_dim.second,train_dim.first);
-    train.dont_permute(); // Uncomment this to remove random permutations of dimensions
+    //train.permute(); // Uncomment this to remove random permutations of dimensions
     for (auto &v : train_v) {
         train.insert(v);
     }
