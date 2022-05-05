@@ -136,6 +136,7 @@ namespace puffinn {
             memory_limit(memory_limit),
             hash_args(hash_args.copy())
         {
+            dataset.permute();
             static_assert(
                 std::is_same<TSim, typename THash::Sim>::value
                 && std::is_same<TSim, typename TSketch::Sim>::value,
@@ -157,6 +158,7 @@ namespace puffinn {
             memory_limit(memory_limit),
             hash_args(hash_args.copy())
         {
+            dataset.permute();
         #ifdef __AVX2__
             std::cout << "USING AVX2 INSTRUCTIONS" << std::endl;
         #endif
