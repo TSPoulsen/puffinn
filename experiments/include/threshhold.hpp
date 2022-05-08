@@ -28,11 +28,11 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     std::cerr << "START PQ FILTER PASSING" << std::endl << std::endl;
 #ifdef __AVX2__
     std::cerr << "USING AVX2" << std::endl;
+#endif
     KMeans::distanceType dtype;
     if (loss == "mahalanobis") dtype = KMeans::mahalanobis;
     else if (loss == "euclidean") dtype = KMeans::euclidean;
     else assert(false);
-#endif
     struct utils::Timer t;
     t.start();
     // setup
@@ -87,7 +87,7 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     // The array that all results are written to, so the same size array doesn't have to be reallocated all the time
     for (int j = 0; j < test_dim.first; j++) {
         std::cout << "query: " << j << std::endl;
-        auto q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
+        int16_t *q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
         filter.precomp_query_to_centroids(q);
         for (int i = 0; i < train_dim.first; i++) {
             product_arr[j*train_dim.first + i] = filter.estimatedInnerProduct(i);
@@ -117,6 +117,7 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
 void lsh_passing_filter(std::string data_path = DEFAULT_DATA, const int n_sketches = 1)
 {
     std::cout << "START LSH FILTER PASSING" << std::endl << std::endl;
+    std::cout << data_path << " " << n_sketches << std::endl;
 
     std::stringstream ss;
     int start = data_path.find("/") + 1,
@@ -159,6 +160,17 @@ void lsh_passing_filter(std::string data_path = DEFAULT_DATA, const int n_sketch
     H5::DataSet *b_diffs = new H5::DataSet(file->createDataSet("collision_prob", H5::PredType::NATIVE_FLOAT, space));
     b_diffs->write(diffs, H5::PredType::NATIVE_FLOAT);
 
+    for (int j = 0; j < test_dim.first; j++) {
+        std::cout << "query: " << j << std::endl;
+        auto q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
+        for (int i = 0; i < train_dim.first; i++) {
+            diffs[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[i], train.get_description().storage_len));
+        }
+    }
+
+    H5::DataSet *real_inner = new H5::DataSet(file->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
+    real_inner->write(diffs, H5::PredType::NATIVE_FLOAT);
+
     delete[] diffs;
 }
 
@@ -176,7 +188,7 @@ void run_pass_filter(int argc, char *argv[])
     }
     else if (argc == 3) {
         const std::string data_path = argv[1];
-        const bool n_sketches = atoi(argv[2]);
+        const int n_sketches = atoi(argv[2]);
         lsh_passing_filter(data_path, n_sketches);
     }
 

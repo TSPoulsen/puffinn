@@ -8,6 +8,7 @@
 #include <H5Cpp.h>
 #include <string>
 #include <chrono>
+#include <puffinn/dataset.hpp>
 #include "puffinn.hpp"
 
 
@@ -85,13 +86,15 @@ namespace utils {
         int n = data_dims[0], dim = data_dims[1];
         std::valarray<float> temp(n * dim);
         h5_dataset.read(&temp[0], H5::PredType::NATIVE_FLOAT);
-        if (n > max_size) n = max_size;
-        for (int i = 0; i < n; i++ ) {
-            std::vector<float> vec(&temp[i*dim], &temp[(i+1)*dim]);
+
+        int to_collect = std::min(n, max_size);
+        auto sample_idcs = puffinn::random_sample(to_collect, n);
+        for (int i = 0; i < to_collect; i++ ) {
+            std::vector<float> vec(&temp[sample_idcs[i]*dim], &temp[sample_idcs[i]*dim+dim]);
             data.push_back(vec);
         }
-        std::cout << "Loaded "<< set << " dataset of size (" << n << "," << dim << ")" << std::endl;
-        return std::make_pair(n, dim);;
+        std::cout << "Loaded "<< set << " dataset of size (" << to_collect << "," << data[0].size() << ")" << std::endl;
+        return std::make_pair(to_collect, data[0].size());;
     }
 
 }
