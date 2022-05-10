@@ -100,6 +100,20 @@ Format for PQ:
 - Maha dist (intuitively) should give lower PQ errors when the data is correlated, and on uncorrelated data it should be exactly the same as euclidean.
 
 
+- More details about puffinn, is that more theory explained or more practicalities (such as the sorted list of hashes)?  More about filter, threshold, 1 out of 32 to estimate and such, perhaps
+- Is 8/16 odd choices of M, that is what other papers have done so we just followed that
+
+One motivated approach to dyn threshhold, which might fail and we can discuss why
+
+compare time as well to LSH sketching 
+static bit or static time
+
+I Want to outline somewhere that PQ has been shown to be better than HP and gives grounds for the whole thesis.
+Better colour scheme for vizualisations
+# ASK MARTIN
+Can we use cosine similarity and angular similarity interchangeably or should we just stick to one.
+How do we hand in the code, and specifically what is it that we hand in.
+
 
  
 ### Notes from previous Meetings

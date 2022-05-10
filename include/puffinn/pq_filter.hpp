@@ -80,7 +80,7 @@ namespace puffinn{
             pqCodes.resize(dataset.get_size());
             createCodebook();
             // createDistanceTable();
-            // bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
+            bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
             std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
         }
 
