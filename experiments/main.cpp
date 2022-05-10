@@ -15,10 +15,7 @@ int main(int argc, char *argv[]) {
     //ang_dist_glove_subset();
     //pq_passing_filter();
     // time_kmeans();
-    // l2_quant_error();
-    // all_bench();
-    //lsh_passing_filter();
-    run_pass_filter(argc, argv);
-    // inertia_run();
+    //quant_error();
+    all_bench();
     //inertia_variance();
 }
