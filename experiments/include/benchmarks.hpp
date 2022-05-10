@@ -1,5 +1,7 @@
 #include <nanobench.h>
 #include <puffinn/kmeans.hpp>
+#include "puffinn/filterer.hpp"
+
 #include <puffinn/pq_filter.hpp>
 #include <puffinn/collection.hpp>
 #include <puffinn.hpp>
@@ -66,17 +68,17 @@ void kmeansBench(ankerl::nanobench::Bench *bencher)
 void pqfBench(ankerl::nanobench::Bench *bencher)
 {
     std::vector<std::vector<float>> data;
-    std::string data_path = "data/glove-25-angular.hdf5";
+    std::string data_path = "data/glove-100-angular.hdf5";
     auto dims = utils::load(data, "train", data_path, 50000);
     puffinn::Dataset<puffinn::UnitVectorFormat> ds(data[0].size(), data.size());    
     for(std::vector<float> v: data){
         ds.insert(v);
     }
-    puffinn::PQFilter pq1(ds, 4, 256);
+    puffinn::PQFilter pq1(ds, 8, 256);
     pq1.rebuild();
-    alignas(32) int16_t tmp[pq1.getPadSize()];
-    pq1.createPaddedQueryPoint(ds[110], tmp);
 
+    pq1.precomp_query_to_centroids(ds[0]);
+    /*
     bencher->run("Asymmetric computing PQ code every call", [&] {
         ankerl::nanobench::doNotOptimizeAway(pq1.asymmetricDistanceComputation_simple(ds[0], ds[110]));
     });    
@@ -96,40 +98,44 @@ void pqfBench(ankerl::nanobench::Bench *bencher)
     });
 
     
-    bencher->run("building query distances", [&] {
-        pq1.precomp_query_to_centroids(tmp);
-    });
-
-    bencher->run("Estimated Inner product O(M)", [&] {
-        for(unsigned int i = 0; i < 10000; i++){
-            ankerl::nanobench::doNotOptimizeAway(pq1.estimatedInnerProduct(0u));
+    std::vector<unsigned int> sample_idx = random_sample(5000, 50000);
+    bencher->run("PQ sketches estimation cost", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway( 
+            pq1.estimatedInnerProduct(*idx));
         }
     });
+    
 
-
+    
     bencher->run("True Inner product", [&] {
         for(unsigned int i = 0; i < 10000; i++){
             ankerl::nanobench::doNotOptimizeAway(puffinn::dot_product_i16_avx2(ds[0], ds[110], ds.get_description().storage_len));
         }
     });
-
+    */
+    bencher->run("building query distances", [&] {
+        pq1.precomp_query_to_centroids(ds[0]);
+    });
+    
+    
 }
 void imp(ankerl::nanobench::Bench *bencher){
 
     std::vector<std::vector<float>> data;
-    std::string data_path = "data/glove-25-angular.hdf5";
+    std::string data_path = "data/glove-100-angular.hdf5";
     auto dims = utils::load(data, "train", data_path, 500000);
-    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 1024*1024*1024, true, puffinn::IndependentHashArgs<puffinn::CosineSimilarity::DefaultHash>(), 4, 56);
+    puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 1024*1024*1024, true, puffinn::IndependentHashArgs<puffinn::CosineSimilarity::DefaultHash>(), 16, 256);
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();  
     bencher->run("search with Simple", [&] {
-        std::vector<uint32_t> result = index.search(data[1420], 20, 0.1, puffinn::FilterType::Simple);
+        std::vector<uint32_t> result = index.search(data[1420], 20, 0.5, puffinn::FilterType::Simple);
     });
     //bencher->run("search with None", [&] {
         //std::vector<uint32_t> result = index.search(query, 10, 0.1, puffinn::FilterType::None);
     //});
     bencher->run("search with PQ_simple", [&] {
-        std::vector<uint32_t> result = index.search(data[1420], 20, 0.1, puffinn::FilterType::PQ_Simple);
+        std::vector<uint32_t> result = index.search(data[1420], 20, 0.5, puffinn::FilterType::PQ_Simple);
     });
 
     /*   
@@ -143,11 +149,13 @@ void imp(ankerl::nanobench::Bench *bencher){
 void correctnessMeassurementPQ(){
 
     std::vector<std::vector<float>> data;
-    std::string data_path = "data/glove-25-angular.hdf5";
+    std::string data_path = "data/glove-100-angular.hdf5";
     int n = 500000;
     int topK = 10;
     auto dims = utils::load(data, "train", data_path, n);
     puffinn::Index<puffinn::CosineSimilarity> index(dims.second, 600*1024*1024, true, puffinn::IndependentHashArgs<puffinn::CosineSimilarity::DefaultHash>(), 4, 56);
+    //
+    return;
     for (std::vector<float> & v : data) { index.insert(v); }
     index.rebuild();  
     for(int i = 0; i <n; i++){
@@ -163,6 +171,81 @@ void correctnessMeassurementPQ(){
         it = std::set_intersection(guess.begin(), guess.end(), ans.begin(), ans.end(),v.begin());
         std::cout << i << "," << (it - v.begin())<< std::endl;
     }
+
+}
+
+
+void Speed_bench(ankerl::nanobench::Bench *bencher){
+    using namespace puffinn;
+    std::vector<std::vector<float>> data;
+    std::string data_path = "data/glove-25-angular.hdf5";
+    auto dims = utils::load(data, "train", data_path, 50000);
+    Dataset<UnitVectorFormat> ds(data[0].size(), data.size());    
+    for(std::vector<float> v: data){
+        ds.insert(v);
+    }
+    Filterer<CosineSimilarity::DefaultSketch> filt(IndependentHashArgs<CosineSimilarity::DefaultSketch>(),ds.get_description());
+    filt.add_sketches(ds, 0);
+    QuerySketches Sketches;
+    Sketches = filt.reset(ds[0]);
+    
+    puffinn::PQFilter pq8(ds, 8, 256);
+    puffinn::PQFilter pq16(ds, 16, 256);
+    pq8.rebuild();
+    pq16.rebuild();
+    pq8.precomp_query_to_centroids(ds[0]);
+    pq16.precomp_query_to_centroids(ds[0]);
+    
+    std::vector<unsigned int> sample_idx = random_sample(5000, 50000);
+    bencher->run("HP-LSH query precomp cost", [&]{
+        
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway(filt.reset(ds[*idx]));
+        }
+    });
+    
+    bencher->run("building query distances m8", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            pq8.precomp_query_to_centroids(ds[*idx]);
+        }
+    });
+    
+    bencher->run("building query distances m16", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            pq16.precomp_query_to_centroids(ds[*idx]);
+        }
+    });
+
+    bencher->run("HP-LSH sketching estimation cost", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway( 
+            Sketches.passes_filter(filt.get_sketch(*idx, (*idx)%32), (*idx)%32));
+        }
+    });
+    
+    bencher->run("PQ sketches estimation cost", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway( 
+            pq8.estimatedInnerProduct(*idx));
+        }
+    });
+
+    bencher->run("PQ sketches estimation cost", [&] {
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway( 
+            pq16.estimatedInnerProduct(*idx));
+        }
+    });
+
+    bencher->run("True Inner product", [&] {
+        for(unsigned int i = 0; i < 5000; i++){
+            ankerl::nanobench::doNotOptimizeAway(puffinn::dot_product_i16_avx2(ds[i], ds[i*2], ds.get_description().storage_len));
+        }
+    });
+    
+
+
+
 
 }
 
@@ -183,14 +266,15 @@ void all_bench()
 {
     ankerl::nanobench::Bench bencher;
     bencher.minEpochIterations(2000);
+    Speed_bench(&bencher);
+    //pqfBench(&bencher);
     //correctnessMeassurementPQ();
-    imp(&bencher);
+    //imp(&bencher);
     //mahaBench(&bencher);
     //eucBench(&bencher);
 
     //qualityAsProg();
     //bencher.minEpochIterations(10);
     //bencher.minEpochIterations(10);
-    //pqfBench(&bencher);
     //kmeansBench(&bencher);
 }

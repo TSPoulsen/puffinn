@@ -14,7 +14,7 @@ using namespace puffinn;
 int main() {
     //ang_dist_glove_subset();
     // time_kmeans();
-    quant_error();
-    //all_bench();
+    //quant_error();
+    all_bench();
     //inertia_variance();
 }
