@@ -18,8 +18,10 @@ types = {
     #"mahalanobis_32_perm.hdf5": "Maha_M32",
     #"euclidean_32_perm.hdf5": "Euc_M32"}
 lsh_types = {
-    "lsh_2.hdf5" : "LSH_Bit",
-    "lsh_16.hdf5" : "LSH_Time" }
+    #"lsh_1_last.hdf5" : ["LSH_last1", 1],
+    #"lsh_5_last.hdf5" : ["LSH_last5", 5]}
+    "lsh_1_first.hdf5" : ["LSH_Bit", 1],
+    "lsh_5_first.hdf5" : ["LSH_Time", 5] }
     
 d_prefix = ["glove-100-angular", "nytimes-256-angular", "deep-image-96-angular"]
 
@@ -27,11 +29,11 @@ SAMPLE_SIZE = 10000000
 TOP = False # if True Gives only differences in estimation of top 100 inner products for each query
 QUICK = False # If True quickly creates plot, with almost no data to get a visual of how the plot would look like
 
-def infer_estimates(coll: np.array) -> np.array:
+def infer_estimates(coll: np.array, n_sketches) -> np.array:
     """
     Calculates the inner products given collision probabilities between query sketch and data hashes
     """
-    return np.cos(np.pi * (1-coll))
+    return np.cos(np.pi * (1-(coll/(64*n_sketches))))
 
 
 

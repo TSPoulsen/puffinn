@@ -112,6 +112,8 @@ I Want to outline somewhere that PQ has been shown to be better than HP and give
 Better colour scheme for vizualisations
 # ASK MARTIN
 Can we use cosine similarity and angular similarity interchangeably or should we just stick to one.
+
+
 How do we hand in the code, and specifically what is it that we hand in.
 
 
@@ -174,3 +176,48 @@ Distances stored as Fixpoints(int16_t)
 |            6,774.71 |          147,607.79 |    2.9% |      0.16 | `building query distances`
 |           16,363.27 |           61,112.49 |    1.7% |      0.39 | `Estimated Inner product O(M)`
 |           69,596.97 |           14,368.44 |    0.3% |      1.67 | `True Inner product`
+
+# Glove-100
+
+|               ns/op |                op/s |    err% |          ins/op |          cyc/op |    IPC |         bra/op |   miss% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------------:|----------------:|-------:|---------------:|--------:|----------:|:----------
+|      255,159,126.76 |                3.92 |    0.1% |1,922,730,259.45 |  914,943,440.23 |  2.101 | 166,960,256.32 |    0.3% |    304.57 | `HP-LSH query precomp cost`
+|      129,900,378.04 |                7.70 |    0.0% |  953,364,691.15 |  465,941,496.21 |  2.046 |  42,890,130.99 |    0.3% |    154.99 | `building query distances m8`
+|      260,187,732.10 |                3.84 |    0.0% |1,908,375,453.52 |  933,182,469.09 |  2.045 |  86,130,261.36 |    0.3% |    310.50 | `building query distances m16`
+|           22,915.22 |           43,639.12 |    0.0% |      190,003.15 |       82,186.35 |  2.312 |      10,001.02 |    0.0% |      0.03 | `HP-LSH sketching estimation cost`
+|          132,822.16 |            7,528.86 |    0.0% |      580,004.25 |      476,344.31 |  1.218 |      40,001.13 |    0.0% |      0.16 | `PQ sketches estimation cost M=8`
+|          254,553.85 |            3,928.44 |    0.0% |      960,004.38 |      912,845.36 |  1.052 |      60,001.25 |    0.0% |      0.31 | `PQ sketches estimation cost M=16`
+|          204,358.63 |            4,893.36 |    0.0% |    1,040,006.36 |      732,841.03 |  1.419 |     120,002.21 |    0.0% |      0.25 | `True Inner product`
+
+
+
+## Average of the 10000
+| 25515 | HP-LSH query precomp cost
+| 12990 | building query distances m8
+| 26019 | building query distances m16
+| 2.291 | HP-LSH sketching estimation cost
+| 13.282 | PQ sketches estimation cost M=8`
+| 25.455 | PQ sketches estimation cost M=16
+| 20.4358 | True inner
+
+
+# Nytimes-256
+|               ns/op |                op/s |    err% |          ins/op |          cyc/op |    IPC |         bra/op |   miss% |     total | benchmark
+|--------------------:|--------------------:|--------:|----------------:|----------------:|-------:|---------------:|--------:|----------:|:----------
+|      367,635,087.09 |                2.72 |    0.0% |3,213,680,373.10 |1,318,237,877.45 |  2.438 | 351,430,368.80 |    0.1% |     44.20 | `HP-LSH query precomp cost`
+|      148,560,551.27 |                6.73 |    0.0% |1,137,200,155.09 |  532,760,742.00 |  2.135 |  63,170,149.64 |    0.2% |     17.83 | `building query distances m8`
+|      260,784,622.83 |                3.83 |    0.0% |1,904,560,267.36 |  935,337,002.40 |  2.036 |  85,330,262.00 |    0.2% |     31.30 | `building query distances m16`
+|           26,915.33 |           37,153.54 |   17.7% |      190,004.27 |       94,497.00 |  2.011 |      10,001.00 |    0.0% |      0.01 | :wavy_dash: `HP-LSH sketching estimation cost` (Unstable with ~10.9 iters. Increase `minEpochIterations` to e.g. 109)
+|          136,375.18 |            7,332.71 |    0.1% |      580,005.36 |      488,772.00 |  1.187 |      40,001.17 |    0.0% |      0.02 | `PQ sketches estimation cost M=8`
+|          260,974.09 |            3,831.80 |    0.3% |      960,005.45 |      935,581.09 |  1.026 |      60,001.27 |    0.0% |      0.03 | `PQ sketches estimation cost M=16`
+|          584,864.64 |            1,709.80 |    1.8% |    1,670,008.09 |    2,094,169.09 |  0.797 |     210,002.60 |    0.0% |      0.09 | `True Inner product`
+
+# Average of the 10000
+ns/op | Name
+36763 | HP-LSH query precomp cost
+14856 | Building query dists M=8
+26078 | Building query dists M=16
+2.6915 | HP-LSH estimation cost
+13.278 | PQ estimation M=8
+25.461 | PQ estimation M=16
+59.395 | True inner

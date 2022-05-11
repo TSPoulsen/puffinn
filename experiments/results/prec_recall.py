@@ -10,17 +10,19 @@ START = -1.0
 END = 1.0
 RAN = np.arange(START,END,DELTA)
 
-filenames = { 
-            "g100_pass_filter_euc_perm.hdf5": "EP",
-            "g100_pass_filter_maha_perm.hdf5": "MP",
-            "g100_pass_filter_euc16_perm.hdf5": "E16P",
-            "g100_pass_filter_maha16_perm.hdf5": "MP16",
-            "g100_pass_filter_euc_no_perm.hdf5": "ENP",
-            "g100_pass_filter_maha_no_perm.hdf5": "MNP",
-            "g100_pass_filter_euc16_no_perm.hdf5": "E16NP",
-            "g100_pass_filter_maha16_no_perm.hdf5": "M16NP"}
+filenames = {
+    "glove-100-angular_euclidean_8_no_perm.hdf5": "E8NP",
+    "glove-100-angular_mahalanobis_16_perm.hdf5": "M16P"}
+# "g100_pass_filter_euc_perm.hdf5": "EP",
+# "g100_pass_filter_maha_perm.hdf5": "MP",
+# "g100_pass_filter_euc16_perm.hdf5": "E16P",
+# "g100_pass_filter_maha16_perm.hdf5": "MP16",
+# "g100_pass_filter_euc_no_perm.hdf5": "ENP",
+# "g100_pass_filter_maha_no_perm.hdf5": "MNP",
+# "g100_pass_filter_euc16_no_perm.hdf5": "E16NP",
+# "g100_pass_filter_maha16_no_perm.hdf5": "M16NP"}
 
-def calcPrecRecallLSH(diffs: np.array, true_neigh) -> Tuple[np.array, np.array]:
+def calcPrecRecallLSH(diffs, true_neigh) -> Tuple[np.array, np.array]:
     int_range = np.arange(0, 64, 1)
     recalls = np.zeros(int_range.shape[0]) 
     precisions = np.zeros(int_range.shape[0]) 
@@ -48,10 +50,12 @@ def calcPrecRecallLSH(diffs: np.array, true_neigh) -> Tuple[np.array, np.array]:
     return recalls, precisions
 
 
-def calcPrecRecallPQ(estimates: np.array, true_neigh: np.array) -> Tuple[np.array, np.array]:
+def calcPrecRecallPQ(estimates: np.array, true_inner: np.array, k: int) -> Tuple[np.array, np.array]:
     recalls = np.zeros((estimates.shape[0], RAN.shape[0]))
     precisions = np.zeros((estimates.shape[0], RAN.shape[0]))
     percent_passed = np.zeros((estimates.shape[0], RAN.shape[0]))
+    t_order = np.argsort(true_inner)
+    true_neigh = t_order[:,-k:]
     order = np.argsort(estimates)
     print(estimates.shape)
     print(true_neigh.shape)
@@ -92,14 +96,14 @@ if __name__ == "__main__":
 
     os.chdir(os.path.dirname(__file__))
     rf = h5py.File("rec_prec_results.hdf5","r+")
-    data = h5py.File("../../data/glove-100-angular.hdf5","r")
-    true_neigh = np.array(data["neighbors"])
-    true_neigh = true_neigh[:,:args.k] # They are given in sorted order
+    #data = h5py.File("../../data/glove-100-angular.hdf5","r")
+    #true_neigh = np.array(data["neighbors"])
+    #true_neigh = true_neigh[:,:args.k] # They are given in sorted order
     for fn in filenames.keys():
         print(fn)
         if (filenames[fn] in rf.keys() and str(args.k) in rf[filenames[fn]]) and not args.force:  continue
         hf = h5py.File(fn, "r")
-        rec, prec, p_passed = calcPrecRecallPQ(np.array(hf["estimated_inner"]), true_neigh)
+        rec, prec, p_passed = calcPrecRecallPQ(np.array(hf["estimated_inner"]), np.array(hf["true_inner"]), args.k)
         g = rf.get(filenames[fn],None)
         if not g: g = rf.create_group(filenames[fn])
         if g.get(str(args.k), ""): del g[str(args.k)]
@@ -123,6 +127,6 @@ if __name__ == "__main__":
     #hf.close()
 
 
-    data.close()
+    #data.close()
     rf.close()
 

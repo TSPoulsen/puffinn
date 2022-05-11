@@ -135,43 +135,46 @@ void lsh_passing_filter(std::string data_path = DEFAULT_DATA, const int n_sketch
     std::vector<std::vector<float>> test_v;
     std::pair<int,int> test_dim = utils::load(test_v, "test", data_path, 100);
 
-    float *diffs = new float[test_dim.first * train_dim.first];
+    int *diffs = new int[test_dim.first * train_dim.first];
+    std::fill_n(diffs, test_dim.first * train_dim.first, n_sketches*64);
 
-    Filterer<SimHash> filter(IndependentHashArgs<SimHash>(), train.get_description());
-    filter.add_sketches(train, 0);
-    std::cout << "Calculating diffs" << std::endl;
-    for (unsigned int q_i = 0; q_i < test_dim.first; q_i++) {
-        std::cout << q_i << "-";
-        int16_t *q = to_stored_type<UnitVectorFormat>(test_v[q_i], train.get_description()).get();
-        QuerySketches sketches = filter.reset(q);
-        for (unsigned int i = 0; i < train_dim.first; i++) {
-            int total = 0;
-            for (unsigned int sketch_idx = 0; sketch_idx < n_sketches; sketch_idx++) {
-                uint64_t sketch = filter.get_sketch(i, sketch_idx);
-                uint64_t q_sketch = sketches.query_sketches[sketch_idx];
-                total += popcountll(sketch ^ q_sketch);
+    for (unsigned int s_i = 0; s_i < n_sketches; s_i++) {
+        Filterer<SimHash> filter(IndependentHashArgs<SimHash>(), train.get_description());
+        filter.add_sketches(train, 0);
+        std::cout << "Calculating diffs" << std::endl;
+        for (unsigned int q_i = 0; q_i < test_dim.first; q_i++) {
+            std::cout << q_i << "-" << std::flush;
+            int16_t *q = to_stored_type<UnitVectorFormat>(test_v[q_i], train.get_description()).get();
+            QuerySketches sketches = filter.reset(q);
+            for (uint32_t i = 0; i < train_dim.first; i++) {
+                //std::cout << "\tsketch_idx: " << sketch_idx << std::endl;
+                int_fast32_t sketch_idx = 0; // (q_i + i) % 32;
+                FilterLshDatatype sketch = filter.get_sketch(i, sketch_idx);
+                FilterLshDatatype q_sketch = sketches.query_sketches[sketch_idx];
+                diffs[train_dim.first*q_i + i] -= __builtin_popcountll(sketch ^ q_sketch);
             }
-            diffs[train_dim.first*q_i + i] = ((n_sketches * 64 - total)*1.0f)/(n_sketches * 64);
         }
     }
     std::cout << std::endl;
     hsize_t dims[2] = {test_dim.first, train_dim.first};
     H5::DataSpace space(2, dims);
-    H5::DataSet *b_diffs = new H5::DataSet(file->createDataSet("collision_prob", H5::PredType::NATIVE_FLOAT, space));
-    b_diffs->write(diffs, H5::PredType::NATIVE_FLOAT);
+    H5::DataSet *b_diffs = new H5::DataSet(file->createDataSet("collisions", H5::PredType::NATIVE_INT, space));
+    b_diffs->write(diffs, H5::PredType::NATIVE_INT);
 
+    delete[] diffs;
+    float *tip = new float[test_dim.first * train_dim.first];
     for (int j = 0; j < test_dim.first; j++) {
         std::cout << "query: " << j << std::endl;
         auto q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
         for (int i = 0; i < train_dim.first; i++) {
-            diffs[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[i], train.get_description().storage_len));
+            tip[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[i], train.get_description().storage_len));
         }
     }
 
     H5::DataSet *real_inner = new H5::DataSet(file->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
-    real_inner->write(diffs, H5::PredType::NATIVE_FLOAT);
+    real_inner->write(tip, H5::PredType::NATIVE_FLOAT);
 
-    delete[] diffs;
+    delete[] tip;
 }
 
 void run_pass_filter(int argc, char *argv[]) 

@@ -13,9 +13,9 @@ using namespace puffinn;
 
 int main(int argc, char *argv[]) {
     //ang_dist_glove_subset();
-    //pq_passing_filter();
+    run_pass_filter(argc, argv);
     // time_kmeans();
     //quant_error();
-    all_bench();
+    //all_bench();
     //inertia_variance();
 }
