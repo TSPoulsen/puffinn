@@ -13,6 +13,7 @@
 #include "puffinn/filterer.hpp"
 #include "puffinn/hash/simhash.hpp"
 #include "puffinn/hash_source/independent.hpp"
+#include <puffinn/dataset.hpp>
 
 
 
@@ -46,7 +47,7 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     }
 
     std::vector<std::vector<float>> test_v;
-    std::pair<int,int> test_dim = utils::load(test_v, "test", data_path, 100);
+    std::pair<int,int> test_dim = utils::load(test_v, "test", data_path, 1000);
 
     std::stringstream ss;
     int start = data_path.find("/") + 1,
@@ -57,58 +58,40 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     std::cout << ss.str() << std::endl;
     H5::H5File *file = new H5::H5File(ss.str(), H5F_ACC_TRUNC);
 
-    float *product_arr = new float[test_dim.first * train_dim.first];
+    uint32_t sample_size = 100000u;
+    float *estimated_inner = new float[test_dim.first * sample_size];
+    float *true_inner = new float[test_dim.first * sample_size];
 
     puffinn::PQFilter filter(train, M, 256u, dtype);
     filter.rebuild();
     std::cout << "rebuild done" << std::endl;
 
-/*
-    // First different bootstrapped thresholds
-    size_t bt_size = 6;
-    int boot_k[bt_size] = {1, 10, 15, 20, 50, 100};
-    float *boot_thresh = new float[bt_size];
-
-    for (size_t i = 0; i < bt_size; i++) {
-        boot_thresh[i]= filter.bootStrapThreshold(100u, 5000u, boot_k[i]);
-    }
-    hsize_t dimst[1] = {bt_size};
-    H5::DataSpace spacet(1, dimst);
-    H5::DataSet *boot_k_d = new H5::DataSet(file->createDataSet("threshholds_boot_k", H5::PredType::NATIVE_INT, spacet));
-    boot_k_d->write(boot_k, H5::PredType::NATIVE_INT);
-    H5::DataSet *threshs = new H5::DataSet(file->createDataSet("threshholds", H5::PredType::NATIVE_FLOAT, spacet));
-    threshs->write(boot_thresh, H5::PredType::NATIVE_FLOAT);
-*/
-
-    hsize_t dims[2] = {test_dim.first, train_dim.first};
+    hsize_t dims[2] = {test_dim.first, sample_size};
     H5::DataSpace space(2, dims);
     std::cout << "bootthresh done" << std::endl;
     // Should be interpreted as a (test_dim.first , train_dim.first) array
     // The array that all results are written to, so the same size array doesn't have to be reallocated all the time
+    std::cout << "query: ";
     for (int j = 0; j < test_dim.first; j++) {
-        std::cout << "query: " << j << std::endl;
+        if (j%100 == 0) std::cout << j << "-" << std::flush; 
         int16_t *q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
         filter.precomp_query_to_centroids(q);
-        for (int i = 0; i < train_dim.first; i++) {
-            product_arr[j*train_dim.first + i] = filter.estimatedInnerProduct(i);
+        auto sample_idcs = puffinn::random_sample(sample_size, train.get_size());
+        for (unsigned int i = 0; i < sample_size; i++) {
+            estimated_inner[j*sample_size + i] = filter.estimatedInnerProduct(sample_idcs[i]);
+            true_inner[j*sample_size + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[sample_idcs[i]], train.get_description().storage_len));
         }
     }
 
-    H5::DataSet *estimated_inner = new H5::DataSet(file->createDataSet("estimated_inner", H5::PredType::NATIVE_FLOAT, space));
-    estimated_inner->write(product_arr, H5::PredType::NATIVE_FLOAT);
-    for (int j = 0; j < test_dim.first; j++) {
-        std::cout << "query: " << j << std::endl;
-        auto q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
-        for (int i = 0; i < train_dim.first; i++) {
-            product_arr[j*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[i], train.get_description().storage_len));
-        }
-    }
+    H5::DataSet *eip = new H5::DataSet(file->createDataSet("estimated_inner", H5::PredType::NATIVE_FLOAT, space));
+    eip->write(estimated_inner, H5::PredType::NATIVE_FLOAT);
+    delete[] estimated_inner;
 
-    H5::DataSet *real_inner = new H5::DataSet(file->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
-    real_inner->write(product_arr, H5::PredType::NATIVE_FLOAT);
+    H5::DataSet *tip = new H5::DataSet(file->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
+    tip->write(true_inner, H5::PredType::NATIVE_FLOAT);
 
 
-    delete[] product_arr;
+    delete[] true_inner;
     float execution_time = t.duration();
     std::cerr << std::endl << "EXPERIMENT TOOK: " << execution_time << "s" << std::endl;
 }
