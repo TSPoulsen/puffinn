@@ -196,7 +196,7 @@ void Speed_bench(ankerl::nanobench::Bench *bencher){
     pq8.precomp_query_to_centroids(ds[0]);
     pq16.precomp_query_to_centroids(ds[0]);
     
-    std::vector<unsigned int> sample_idx = random_sample(5000, dims.first);
+    std::vector<unsigned int> sample_idx = random_sample(10000, dims.first);
     bencher->run("HP-LSH query precomp cost", [&]{
         
         for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
@@ -222,15 +222,19 @@ void Speed_bench(ankerl::nanobench::Bench *bencher){
             Sketches.passes_filter(filt.get_sketch(*idx, (*idx)%32), (*idx)%32));
         }
     });
+
+    pq8.precomp_query_to_centroids(ds[0]);
     
-    bencher->run("PQ sketches estimation cost", [&] {
+    bencher->run("PQ sketches estimation cost M=8", [&] {
         for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
             ankerl::nanobench::doNotOptimizeAway( 
             pq8.estimatedInnerProduct(*idx));
         }
     });
 
-    bencher->run("PQ sketches estimation cost", [&] {
+    pq16.precomp_query_to_centroids(ds[0]);
+
+    bencher->run("PQ sketches estimation cost M=16", [&] {
         for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
             ankerl::nanobench::doNotOptimizeAway( 
             pq16.estimatedInnerProduct(*idx));
@@ -238,8 +242,8 @@ void Speed_bench(ankerl::nanobench::Bench *bencher){
     });
 
     bencher->run("True Inner product", [&] {
-        for(unsigned int i = 0; i < 5000; i++){
-            ankerl::nanobench::doNotOptimizeAway(puffinn::dot_product_i16_avx2(ds[i], ds[i*2], ds.get_description().storage_len));
+        for(auto idx = sample_idx.begin(); idx != sample_idx.end(); idx++){
+            ankerl::nanobench::doNotOptimizeAway(puffinn::dot_product_i16_avx2(ds[0], ds[*idx], ds.get_description().storage_len));
         }
     });
     
@@ -265,7 +269,7 @@ void qualityAsProg(){
 void all_bench()
 {
     ankerl::nanobench::Bench bencher;
-    bencher.minEpochIterations(5000);
+    bencher.minEpochIterations(100);
     Speed_bench(&bencher);
     //pqfBench(&bencher);
     //correctnessMeassurementPQ();
