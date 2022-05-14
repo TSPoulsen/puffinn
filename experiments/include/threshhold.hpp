@@ -21,6 +21,16 @@
 using namespace puffinn;
 
 
+void write_results(float *estimates, float *true_inner, H5::Group *grp, H5::DataSpace space) {
+    H5::DataSet *eip = new H5::DataSet(grp->createDataSet("estimated_inner", H5::PredType::NATIVE_FLOAT, space));
+    eip->write(estimates, H5::PredType::NATIVE_FLOAT);
+
+    H5::DataSet *tip = new H5::DataSet(grp->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
+    tip->write(true_inner, H5::PredType::NATIVE_FLOAT);
+}
+
+
+
 
 // Calculates the true inner product between queries and dataset
 // as well as estimated inner products using PQ for varying values of m [1,2,4,8]
@@ -38,7 +48,7 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     t.start();
     // setup
     std::vector<std::vector<float>> train_v;
-    std::pair<int,int> train_dim = utils::load(train_v, "train", data_path, 5000000);
+    std::pair<int,int> train_dim = utils::load(train_v, "train", data_path, 500000);
     Dataset<UnitVectorFormat> train(train_dim.second,train_dim.first);
     if (perm)
         train.permute();
@@ -58,39 +68,42 @@ void pq_passing_filter(const unsigned int M = 8, const std::string loss = "mahal
     std::cout << ss.str() << std::endl;
     H5::H5File *file = new H5::H5File(ss.str(), H5F_ACC_TRUNC);
 
-    uint32_t sample_size = 100000u;
-    float *estimated_inner = new float[test_dim.first * sample_size];
-    float *true_inner = new float[test_dim.first * sample_size];
+    unsigned int section_size = 50;
+    float *estimated_inner = new float[section_size * train_dim.first];
+    float *true_inner = new float[section_size * train_dim.first];
 
     puffinn::PQFilter filter(train, M, 256u, dtype);
     filter.rebuild();
     std::cout << "rebuild done" << std::endl;
 
-    hsize_t dims[2] = {test_dim.first, sample_size};
+    hsize_t dims[2] = {section_size, train_dim.first};
     H5::DataSpace space(2, dims);
     std::cout << "bootthresh done" << std::endl;
     // Should be interpreted as a (test_dim.first , train_dim.first) array
     // The array that all results are written to, so the same size array doesn't have to be reallocated all the time
     std::cout << "query: ";
+    unsigned int section = 0;
     for (int j = 0; j < test_dim.first; j++) {
-        if (j%100 == 0) std::cout << j << "-" << std::flush; 
+        if (j%section_size == 0){
+            std::cout << j << "-" << std::flush; 
+            std::ostringstream ss_sec; ss_sec << "section" << section;
+            H5::Group *grp = new H5::Group(file->createGroup(ss_sec.str()));
+            write_results(estimated_inner, true_inner, grp, space);
+            section++;
+
+        } 
         int16_t *q = to_stored_type<UnitVectorFormat>(test_v[j], train.get_description()).get();
         filter.precomp_query_to_centroids(q);
-        auto sample_idcs = puffinn::random_sample(sample_size, train.get_size());
-        for (unsigned int i = 0; i < sample_size; i++) {
-            estimated_inner[j*sample_size + i] = filter.estimatedInnerProduct(sample_idcs[i]);
-            true_inner[j*sample_size + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[sample_idcs[i]], train.get_description().storage_len));
+        for (unsigned int i = 0; i < train_dim.first; i++) {
+            estimated_inner[(j%section_size)*train_dim.first + i] = filter.estimatedInnerProduct(i);
+            true_inner[(j%section_size)*train_dim.first + i] = UnitVectorFormat::from_16bit_fixed_point(dot_product_i16(q, train[i], train.get_description().storage_len));
         }
     }
+    std::ostringstream ss_sec; ss_sec << "section" << section;
+    H5::Group *grp = new H5::Group(file->createGroup(ss_sec.str()));
+    write_results(estimated_inner, true_inner, grp, space);
 
-    H5::DataSet *eip = new H5::DataSet(file->createDataSet("estimated_inner", H5::PredType::NATIVE_FLOAT, space));
-    eip->write(estimated_inner, H5::PredType::NATIVE_FLOAT);
     delete[] estimated_inner;
-
-    H5::DataSet *tip = new H5::DataSet(file->createDataSet("true_inner", H5::PredType::NATIVE_FLOAT, space));
-    tip->write(true_inner, H5::PredType::NATIVE_FLOAT);
-
-
     delete[] true_inner;
     float execution_time = t.duration();
     std::cerr << std::endl << "EXPERIMENT TOOK: " << execution_time << "s" << std::endl;

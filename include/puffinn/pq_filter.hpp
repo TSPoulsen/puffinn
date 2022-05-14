@@ -80,8 +80,8 @@ namespace puffinn{
             pqCodes.resize(dataset.get_size());
             createCodebook();
             // createDistanceTable();
-            bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
-            std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
+            //bootThreshold = bootStrapThreshold(100u, 5000u, 10u);
+            //std::cout << "this is the boot threshold: " << bootThreshold << std::endl;
         }
 
         uint64_t memory_usage()
@@ -176,8 +176,8 @@ namespace puffinn{
                 
                 for (unsigned int ci = 0; ci < k; ci++ ) {
                     std::vector<unsigned int> cm = kmeans.getGBMembers(ci);
-                    for (auto &m : cm) {
-                        pqCodes[m].push_back((uint8_t)ci);
+                    for (auto &mem : cm) {
+                        pqCodes[mem].push_back((uint8_t)ci);
                     }
                 }
 
